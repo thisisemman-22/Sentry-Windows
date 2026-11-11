@@ -1,0 +1,73 @@
+name: campus_parking_desktop
+description: SENTRY Flutter Windows Desktop Application (Guard & ICT Command Console) for BatStateU TNEU Alangilan Campus.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  dio: ^5.4.3+1
+  intl: ^0.19.0
+  uuid: ^4.4.0
+  shared_preferences: ^2.2.3
+  web_socket_channel: ^2.4.5
+  # Motion system: staggered reveals + Material shared-axis / fade-through transitions
+  flutter_animate: ^4.5.0
+  animations: ^2.0.11
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - config/local.example.json
+    - config/demo.example.json
+
+  # Bundled (offline-safe) typefaces — all SIL Open Font License 1.1 (see assets/fonts/OFL-*.txt)
+  # - Schibsted Grotesk: editorial display face for headings & large numbers
+  # - Atkinson Hyperlegible Next: Braille Institute low-vision UI face (body text)
+  # - Atkinson Hyperlegible Mono: unambiguous 0/O, 1/I/l glyphs for plates, codes & timers
+  fonts:
+    - family: SchibstedGrotesk
+      fonts:
+        - asset: assets/fonts/SchibstedGrotesk-400.ttf
+          weight: 400
+        - asset: assets/fonts/SchibstedGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/SchibstedGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/SchibstedGrotesk-700.ttf
+          weight: 700
+        - asset: assets/fonts/SchibstedGrotesk-800.ttf
+          weight: 800
+        - asset: assets/fonts/SchibstedGrotesk-900.ttf
+          weight: 900
+    - family: AtkinsonHyperlegibleNext
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-400.ttf
+          weight: 400
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-500.ttf
+          weight: 500
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-600.ttf
+          weight: 600
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-700.ttf
+          weight: 700
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-800.ttf
+          weight: 800
+    - family: AtkinsonHyperlegibleMono
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-400.ttf
+          weight: 400
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-500.ttf
+          weight: 500
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-600.ttf
+          weight: 600
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-700.ttf
+          weight: 700
