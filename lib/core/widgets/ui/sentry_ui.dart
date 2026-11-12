@@ -221,45 +221,71 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final titleWidget = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Semantics(
-                      header: true,
-                      child: Text(
-                        title,
-                        style: SentryTheme.display(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          color: p.text,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (hint != null) ...[
-                    const SizedBox(width: 6),
-                    InfoHint(hint!),
-                  ],
-                ],
+        Flexible(
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: SentryTheme.display(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+                color: p.text,
               ),
+            ),
+          ),
+        ),
+        if (hint != null) ...[
+          const SizedBox(width: 6),
+          InfoHint(hint!),
+        ],
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 560 && trailing != null;
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleWidget,
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
                 Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
               ],
+              const SizedBox(height: 10),
+              trailing!,
             ],
-          ),
-        ),
-        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-      ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  titleWidget,
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(subtitle!,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 12),
+              trailing!,
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -306,6 +332,7 @@ class InfoHint extends StatelessWidget {
 class MetricTile extends StatelessWidget {
   final String label;
   final int value;
+  final String? valueDisplay;
   final String? suffix;
   final String? caption;
   final IconData icon;
@@ -320,6 +347,7 @@ class MetricTile extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    this.valueDisplay,
     this.suffix,
     this.caption,
     this.tone = PillTone.neutral,
@@ -366,11 +394,18 @@ class MetricTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                AnimatedCount(
-                  key: valueKey,
-                  value: value,
-                  style: SentryTheme.display(fontSize: 40, color: p.text),
-                ),
+                if (valueDisplay != null)
+                  Text(
+                    valueDisplay!,
+                    key: valueKey,
+                    style: SentryTheme.display(fontSize: 40, color: p.text),
+                  )
+                else
+                  AnimatedCount(
+                    key: valueKey,
+                    value: value,
+                    style: SentryTheme.display(fontSize: 40, color: p.text),
+                  ),
                 if (suffix != null) ...[
                   const SizedBox(width: 6),
                   Flexible(
@@ -388,9 +423,19 @@ class MetricTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.titleSmall,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: (Theme.of(context).textTheme.titleSmall ??
+                            const TextStyle())
+                        .copyWith(fontSize: 12),
+                  ),
+                ),
+              ],
             ),
             if (caption != null) ...[
               const SizedBox(height: 4),
@@ -684,12 +729,15 @@ class _SegmentButton extends StatelessWidget {
                   Icon(icon, size: 17, color: selected ? p.crimsonHover : fg),
                   const SizedBox(width: 8),
                 ],
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
                   ),
                 ),
               ],

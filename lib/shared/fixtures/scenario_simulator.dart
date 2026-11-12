@@ -1,7 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/config/app_config.dart';
 import '../../core/config/roster_mode.dart';
 import '../../core/network/api_envelope.dart';
 import '../../core/network/ws_client.dart';
+import '../../features/access_logs/data/access_logs_repository.dart';
+import '../../features/administration/data/administration_repository.dart';
+import '../../features/device_monitoring/data/device_monitoring_repository.dart';
+import '../../features/guard_reviews/data/guard_reviews_repository.dart';
+import '../../features/live_gate_monitoring/data/gate_monitoring_repository.dart';
+import '../../features/parking_management/data/parking_repository.dart';
 import '../models/attempt_models.dart';
 import '../models/audit_models.dart';
 import '../models/auth_models.dart';
@@ -24,9 +31,11 @@ class SentrySystemState {
   final List<DeviceDto> devices;
   final List<AuditLogDto> auditLogs;
   final List<ParticipantUserDto> participantDirectory;
+  final Map<String, FaceEnrollmentStatusDto> faceEnrollments; // keyed by userCode
   final List<String> recentActivityFeed;
   final WsStreamState wsState;
   final String? lastActionBanner;
+  final ApiError? lastRealApiError;
 
   const SentrySystemState({
     required this.rosterMode,
@@ -38,9 +47,11 @@ class SentrySystemState {
     required this.devices,
     required this.auditLogs,
     required this.participantDirectory,
+    required this.faceEnrollments,
     required this.recentActivityFeed,
     required this.wsState,
     this.lastActionBanner,
+    this.lastRealApiError,
   });
 
   DashboardDto computeDashboardKpis() {
@@ -113,9 +124,12 @@ class SentrySystemState {
     List<DeviceDto>? devices,
     List<AuditLogDto>? auditLogs,
     List<ParticipantUserDto>? participantDirectory,
+    Map<String, FaceEnrollmentStatusDto>? faceEnrollments,
     List<String>? recentActivityFeed,
     WsStreamState? wsState,
     String? lastActionBanner,
+    ApiError? lastRealApiError,
+    bool clearRealApiError = false,
   }) {
     return SentrySystemState(
       rosterMode: rosterMode ?? this.rosterMode,
@@ -127,9 +141,13 @@ class SentrySystemState {
       devices: devices ?? this.devices,
       auditLogs: auditLogs ?? this.auditLogs,
       participantDirectory: participantDirectory ?? this.participantDirectory,
+      faceEnrollments: faceEnrollments ?? this.faceEnrollments,
       recentActivityFeed: recentActivityFeed ?? this.recentActivityFeed,
       wsState: wsState ?? this.wsState,
       lastActionBanner: lastActionBanner,
+      lastRealApiError: clearRealApiError
+          ? null
+          : (lastRealApiError ?? this.lastRealApiError),
     );
   }
 }
@@ -137,13 +155,72 @@ class SentrySystemState {
 /// Interactive Mock Repository & Scenario Simulator (`T01–T32`) enforcing all
 /// 6 state separation invariants and Patrick Carpio's 3 confirmed extensions.
 class SentryScenarioController extends StateNotifier<SentrySystemState> {
+  DataSourceMode dataSourceMode;
   final WsInvalidationCoordinator wsCoordinator;
+  final GateMonitoringRepository? gateMonitoringRepository;
+  final GuardReviewsRepository? guardReviewsRepository;
+  final ParkingRepository? parkingRepository;
+  final AccessLogsRepository? accessLogsRepository;
+  final DeviceMonitoringRepository? deviceMonitoringRepository;
+  final AdministrationRepository? administrationRepository;
   int _seqCounter = 104;
 
   SentryScenarioController({
     required RosterMode initialRosterMode,
     required this.wsCoordinator,
-  }) : super(_buildInitialState(initialRosterMode));
+    this.dataSourceMode = DataSourceMode.mock,
+    this.gateMonitoringRepository,
+    this.guardReviewsRepository,
+    this.parkingRepository,
+    this.accessLogsRepository,
+    this.deviceMonitoringRepository,
+    this.administrationRepository,
+  }) : super(
+          dataSourceMode == DataSourceMode.real
+              ? _buildEmptyRealState(initialRosterMode)
+              : _buildInitialState(initialRosterMode),
+        );
+
+  /// Unlocks Developer Test Mode in memory for the current session,
+  /// switching from `DataSourceMode.real` to `DataSourceMode.mock` and
+  /// loading the full `U001–U007` test fixtures.
+  void enableDeveloperMockMode() {
+    final alreadyMockPopulated =
+        dataSourceMode == DataSourceMode.mock && state.spaces.isNotEmpty;
+    dataSourceMode = DataSourceMode.mock;
+    if (!alreadyMockPopulated) {
+      state = _buildInitialState(state.rosterMode).copyWith(
+        lastActionBanner: 'Developer Test Mode Enabled',
+      );
+    } else {
+      state = state.copyWith(
+        lastActionBanner: 'Developer Test Mode Enabled',
+      );
+    }
+  }
+
+  /// Strict fail-closed empty initial state for `DATA_SOURCE=real`.
+  /// Never populates synthetic fixtures (`U001–U007`, `V001–V008`, mock bays, or mock visits).
+  static SentrySystemState _buildEmptyRealState(RosterMode mode) {
+    return SentrySystemState(
+      rosterMode: mode,
+      activeLaneAttempts: const {},
+      attemptHistory: const [],
+      visits: const [],
+      spaces: const [],
+      reviewQueue: const [],
+      devices: const [],
+      auditLogs: const [],
+      participantDirectory: const [],
+      faceEnrollments: const {},
+      recentActivityFeed: const [],
+      wsState: const WsStreamState(
+        status: WsConnectionStatus.reconnecting,
+        lastStreamSequence: 0,
+        resyncRequired: true,
+      ),
+    );
+  }
 
   static SentrySystemState _buildInitialState(RosterMode mode) {
     final now = DateTime.now().toUtc();
@@ -680,6 +757,26 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       ),
     ];
 
+    final initialFaceEnrollments = <String, FaceEnrollmentStatusDto>{
+      for (final u in directory)
+        u.userCode: FaceEnrollmentStatusDto(
+          userId: u.userId,
+          userCode: u.userCode,
+          status: u.faceEnrolled ? 'enrolled' : 'not_enrolled',
+          faceTemplateId: u.faceEnrolled ? u.faceTemplateId : null,
+          modelVersion: 'arcface-r100-v1.1',
+          artifactReference: u.faceEnrolled
+              ? 'vault://biometrics/arcface/${u.userCode}.emb'
+              : null,
+          enrolledAtUtc:
+              u.faceEnrolled ? now.subtract(const Duration(days: 14)) : null,
+          retentionExpiresAtUtc:
+              u.faceEnrolled ? now.add(const Duration(days: 351)) : null,
+          consentVersion: 'RA10173-BSU-2026.1',
+          frameCount: u.faceEnrolled ? 3 : 0,
+        ),
+    };
+
     return SentrySystemState(
       rosterMode: mode,
       activeLaneAttempts: {
@@ -701,6 +798,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       devices: devices,
       auditLogs: initialAudits,
       participantDirectory: directory,
+      faceEnrollments: initialFaceEnrollments,
       recentActivityFeed: const [
         'GATE-NORTH/CAR-IN: V001 (U001) ALLOWED · Space A-C03 HELD (30s) · Awaiting physical passage confirmation',
         'GATE-NORTH/MOTO-IN: V004 (U004) REVIEW_REQUIRED (IDENTITY_UNCERTAIN · 0.52 cosine similarity)',
@@ -716,9 +814,32 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
   }
 
   /// Switches between `RosterMode.classDemo` and `RosterMode.contractSynthetic`
-  /// while preserving all relational UUIDs.
+  /// while preserving all relational UUIDs and any manually registered users.
   void setRosterMode(RosterMode mode) {
-    final updatedDirectory = SentryFixtures.buildParticipantDirectory(mode);
+    final baseDirectory = SentryFixtures.buildParticipantDirectory(mode);
+    final baseCodes = baseDirectory.map((u) => u.userCode).toSet();
+    final customUsers = state.participantDirectory
+        .where((u) => !baseCodes.contains(u.userCode))
+        .toList();
+    final mergedDirectory = [
+      ...baseDirectory.map((baseUser) {
+        final existing = state.participantDirectory
+            .where((u) => u.userCode == baseUser.userCode)
+            .firstOrNull;
+        if (existing == null) return baseUser;
+        return baseUser.copyWith(
+          faceEnrolled: existing.faceEnrolled,
+          faceTemplateId: existing.faceTemplateId,
+          vehicles: existing.vehicles.length > baseUser.vehicles.length
+              ? [
+                  ...baseUser.vehicles,
+                  ...existing.vehicles.skip(baseUser.vehicles.length),
+                ]
+              : baseUser.vehicles,
+        );
+      }),
+      ...customUsers,
+    ];
     final updatedLaneAttempts = <String, AttemptDto>{};
     state.activeLaneAttempts.forEach((laneId, attempt) {
       final vf = SentryFixtures.findVehicleByCode(attempt.vehicleCode);
@@ -735,17 +856,60 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
 
     state = state.copyWith(
       rosterMode: mode,
-      participantDirectory: updatedDirectory,
+      participantDirectory: mergedDirectory,
       activeLaneAttempts: updatedLaneAttempts,
       attemptHistory: updatedHistory,
       lastActionBanner: 'Switched display roster to ${mode.label}.',
     );
   }
 
+  /// Expires the 30s space hold or 20s decision on `laneId` before passage confirmation,
+  /// marking the attempt `expired` and releasing any `held` bay back to `unassigned`.
+  AttemptDto? expireHoldOrDecisionOnLane(String laneId) {
+    final current = state.activeLaneAttempts[laneId];
+    if (current == null) return null;
+    final now = DateTime.now().toUtc();
+    final expiredAttempt = current.copyWith(
+      state: 'expired',
+      expiresAtUtc: now.subtract(const Duration(seconds: 1)),
+      assignmentStatus:
+          current.assignmentStatus == 'held' ? 'released' : current.assignmentStatus,
+      holdExpiresAtUtc: now.subtract(const Duration(seconds: 1)),
+    );
+    final updatedLanes = Map<String, AttemptDto>.from(state.activeLaneAttempts);
+    updatedLanes[laneId] = expiredAttempt;
+    final updatedSpaces = state.spaces.map((s) {
+      if (s.spaceCode == current.spaceCode && s.allocationStatus == 'held') {
+        return s.copyWith(
+          allocationStatus: 'unassigned',
+          clearAssignment: true,
+          clearVisit: true,
+        );
+      }
+      return s;
+    }).toList();
+    state = state.copyWith(
+      activeLaneAttempts: updatedLanes,
+      attemptHistory: [
+        expiredAttempt,
+        ...state.attemptHistory
+            .where((a) => a.correlationId != expiredAttempt.correlationId),
+      ],
+      spaces: updatedSpaces,
+      recentActivityFeed: [
+        'HOLD/DECISION EXPIRED: ${current.vehicleCode ?? current.correlationId} expired before passage confirmation; held bay ${current.spaceCode ?? 'N/A'} released.',
+        ...state.recentActivityFeed.take(14),
+      ],
+      lastActionBanner:
+          'Attempt ${current.correlationId} expired before physical passage confirmation; held bay released.',
+    );
+    return expiredAttempt;
+  }
+
   /// Patrick Carpio's Confirmed Contract #3:
   /// Guard clicks "Confirm Vehicle Crossed Gate (`guard_attestation`)" on an `allowed` attempt.
   /// - Validates 10..500 character `notes`
-  /// - Validates attempt has a non-expired `allowed` decision
+  /// - Validates attempt has a non-expired `allowed` decision and non-expired 30s space hold
   /// - Entry: transitions `held` space -> `assigned` and creates an `active` `VisitDto`
   /// - Exit: closes the `active` `VisitDto` and transitions `assigned` space -> `unassigned` (`released`)
   ApiEnvelope<VisitDto> confirmVehicleCrossedGate({
@@ -753,6 +917,21 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     required String notes,
     required ProfileDto actor,
   }) {
+    if (dataSourceMode == DataSourceMode.real) {
+      const err = ApiError(
+        code: ErrorCatalog.serviceUnavailable,
+        message:
+            'DATA_SOURCE=real prohibits local mock state mutation. Use confirmVehicleCrossedGateAsync via FastAPI.',
+        httpStatus: 503,
+      );
+      recordRealApiFailure(err);
+      return ApiEnvelope.failure(
+        code: err.code,
+        message: err.message,
+        httpStatus: err.httpStatus,
+      );
+    }
+
     final trimmed = notes.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
       return ApiEnvelope.failure(
@@ -783,11 +962,21 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     }
 
     final now = DateTime.now().toUtc();
-    if (decision.isExpired(now) || attempt.state == 'expired') {
+    final holdExpired = attempt.direction == 'entry' &&
+        (attempt.isHoldExpired(now) ||
+            attempt.assignmentStatus == 'released' ||
+            attempt.assignmentStatus == 'expired');
+    if (decision.isExpired(now) ||
+        attempt.isAttemptExpired(now) ||
+        holdExpired) {
+      expireHoldOrDecisionOnLane(laneId);
       return ApiEnvelope.failure(
-        code: ErrorCatalog.decisionExpired,
-        message:
-            'Decision ${decision.decisionId} has expired (20s validity window elapsed). Cannot confirm passage.',
+        code: holdExpired
+            ? ErrorCatalog.attemptExpired
+            : ErrorCatalog.decisionExpired,
+        message: holdExpired
+            ? '30-second parking space hold on ${attempt.spaceCode ?? 'bay'} has expired before passage confirmation. Hold released.'
+            : 'Decision ${decision.decisionId} has expired (20s validity window elapsed). Cannot confirm passage.',
         httpStatus: 409,
       );
     }
@@ -2029,6 +2218,768 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     return ApiEnvelope.success(patched!);
   }
 
+  /// Feature 1: Manual User & Vehicle Registration (`POST /api/v1/admin/users/register` with `Idempotency-Key`).
+  /// - Role-gated to `administrator` (`403 FORBIDDEN` if guard)
+  /// - Validates fields & checks duplicate `email`, `user_code`, `plate_number` (normalized), and `rfid_uid`
+  ///   returning `409 DATABASE_CONFLICT` with inline field details (`details: {'field': ..., 'reason': ...}`).
+  /// - On `201 Created`, inserts the new user + vehicle into `participantDirectory` and `faceEnrollments`
+  ///   so they immediately appear in **Access Logs & Lookup** and **Facial Enrollment**.
+  ApiEnvelope<ManualUserRegistrationResponse> registerUserAndVehicle({
+    required ProfileDto actor,
+    required ManualUserRegistrationRequest request,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.forbidden,
+        message:
+            'HTTP 403 FORBIDDEN: Role "${actor.role.wireValue}" cannot register users (/api/v1/admin/users/register). Requires "administrator".',
+        httpStatus: 403,
+      );
+    }
+
+    final validationErrors = request.validate();
+    if (validationErrors.isNotEmpty) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message: validationErrors.values.first,
+        httpStatus: 422,
+        details: {'field_errors': validationErrors},
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final requestedCode = request.userCode?.trim().toUpperCase() ?? '';
+    final normalizedEmail = request.email.trim().toLowerCase();
+
+    // Check duplicate user_code
+    if (requestedCode.isNotEmpty) {
+      final duplicateCode = state.participantDirectory.any(
+        (u) => u.userCode.toUpperCase() == requestedCode,
+      );
+      if (duplicateCode) {
+        return ApiEnvelope.failure(
+          code: ErrorCatalog.databaseConflict,
+          message: 'User code $requestedCode is already registered.',
+          httpStatus: 409,
+          details: {
+            'field': 'user_code',
+            'reason': 'User code $requestedCode is already registered.',
+          },
+        );
+      }
+    }
+
+    // Check duplicate email
+    final duplicateEmail = state.participantDirectory.any(
+      (u) => u.email.trim().toLowerCase() == normalizedEmail,
+    );
+    if (duplicateEmail) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.databaseConflict,
+        message: 'Email $normalizedEmail is already registered to a participant.',
+        httpStatus: 409,
+        details: {
+          'field': 'email',
+          'reason':
+              'Email $normalizedEmail is already registered to an existing account.',
+        },
+      );
+    }
+
+    // Check duplicate normalized plate number or RFID UID if vehicle is included
+    String? normalizedPlate;
+    String? displayPlate;
+    String? cleanRfid;
+    if (request.includeVehicle) {
+      final rawPlate = request.plateNumber?.trim().toUpperCase() ?? '';
+      if (rawPlate.isNotEmpty) {
+        displayPlate = rawPlate;
+        normalizedPlate = ManualUserRegistrationRequest.normalizePlate(rawPlate);
+        final duplicatePlate = state.participantDirectory.any(
+          (u) => u.vehicles.any(
+            (v) =>
+                (v.normalizedPlateNumber != null &&
+                    v.normalizedPlateNumber!.toUpperCase() == normalizedPlate) ||
+                (v.plateNumberDisplay != null &&
+                    ManualUserRegistrationRequest.normalizePlate(
+                          v.plateNumberDisplay!,
+                        ) ==
+                        normalizedPlate),
+          ),
+        );
+        if (duplicatePlate) {
+          return ApiEnvelope.failure(
+            code: ErrorCatalog.databaseConflict,
+            message:
+                'Normalized plate number $normalizedPlate is already registered to an existing vehicle.',
+            httpStatus: 409,
+            details: {
+              'field': 'plate_number',
+              'reason':
+                  'Normalized plate $normalizedPlate is already registered to another vehicle.',
+            },
+          );
+        }
+      }
+
+      final rawRfid = request.rfidUid?.trim().toUpperCase() ?? '';
+      if (rawRfid.isNotEmpty) {
+        cleanRfid = rawRfid;
+        final duplicateRfid = state.participantDirectory.any(
+          (u) => u.vehicles.any(
+            (v) => v.rfidUid != null && v.rfidUid!.toUpperCase() == cleanRfid,
+          ),
+        );
+        if (duplicateRfid) {
+          return ApiEnvelope.failure(
+            code: ErrorCatalog.databaseConflict,
+            message:
+                'RFID UID $cleanRfid is already assigned to another campus vehicle.',
+            httpStatus: 409,
+            details: {
+              'field': 'rfid_uid',
+              'reason':
+                  'RFID UID $cleanRfid is already assigned to another vehicle.',
+            },
+          );
+        }
+      }
+    }
+
+    // Generate next userCode (e.g. U008) if not provided
+    final String finalUserCode;
+    if (requestedCode.isNotEmpty) {
+      finalUserCode = requestedCode;
+    } else {
+      int nextNum = state.participantDirectory.length + 1;
+      String candidate = 'U${nextNum.toString().padLeft(3, '0')}';
+      while (state.participantDirectory.any((u) => u.userCode == candidate)) {
+        nextNum++;
+        candidate = 'U${nextNum.toString().padLeft(3, '0')}';
+      }
+      finalUserCode = candidate;
+    }
+
+    final seq = _seqCounter++;
+    final newUserId =
+        '10000000-0000-4000-8000-${seq.toString().padLeft(12, '0')}';
+
+    ParticipantVehicleDto? createdVehicle;
+    if (request.includeVehicle) {
+      final totalVehicles = state.participantDirectory.fold<int>(
+        0,
+        (sum, u) => sum + u.vehicles.length,
+      );
+      int nextVNum = totalVehicles + 1;
+      String vCodeCandidate = 'V${nextVNum.toString().padLeft(3, '0')}';
+      while (state.participantDirectory.any(
+        (u) => u.vehicles.any((v) => v.vehicleCode == vCodeCandidate),
+      )) {
+        nextVNum++;
+        vCodeCandidate = 'V${nextVNum.toString().padLeft(3, '0')}';
+      }
+      final vSeq = _seqCounter++;
+      createdVehicle = ParticipantVehicleDto(
+        vehicleId:
+            '20000000-0000-4000-8000-${vSeq.toString().padLeft(12, '0')}',
+        vehicleCode: vCodeCandidate,
+        userCode: finalUserCode,
+        vehicleType: request.vehicleType ?? 'car',
+        plateNumberDisplay: displayPlate,
+        normalizedPlateNumber: normalizedPlate,
+        rfidUid: cleanRfid,
+        vehicleStatus: 'active',
+        authorizationStatus: 'authorized',
+        isPrimaryVehicle: true,
+        notes: 'Registered via Manual User & Vehicle Registration.',
+        updatedAtUtc: now,
+      );
+    }
+
+    final newUser = ParticipantUserDto(
+      userId: newUserId,
+      userCode: finalUserCode,
+      fullName: request.fullName.trim(),
+      email: normalizedEmail,
+      roleCode: request.roleCode,
+      status: 'active',
+      buildingCode: request.buildingCode,
+      faceTemplateId: '',
+      faceEnrolled: false,
+      admissionEvaluated: false,
+      vehicles: createdVehicle != null ? [createdVehicle] : const [],
+    );
+
+    final initialFaceStatus = FaceEnrollmentStatusDto(
+      userId: newUserId,
+      userCode: finalUserCode,
+      status: 'not_enrolled',
+      faceTemplateId: null,
+      modelVersion: 'arcface-r100-v1.1',
+      artifactReference: null,
+      enrolledAtUtc: null,
+      retentionExpiresAtUtc: null,
+      consentVersion: 'RA10173-BSU-2026.1',
+      frameCount: 0,
+    );
+
+    final newAudit = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: 'user_registered',
+      resourceType: 'participant_user',
+      resourceId: newUserId,
+      requestId: 'req-reg-$seq',
+      summary:
+          'Admin ${actor.userCode} manually registered ${newUser.fullName} ($finalUserCode · ${request.roleCode})${createdVehicle != null ? ' with ${createdVehicle.vehicleType} ${createdVehicle.vehicleCode} (${displayPlate ?? 'RFID credential registered'})' : ''}.',
+    );
+
+    state = state.copyWith(
+      participantDirectory: [...state.participantDirectory, newUser],
+      faceEnrollments: {
+        ...state.faceEnrollments,
+        finalUserCode: initialFaceStatus,
+      },
+      auditLogs: [newAudit, ...state.auditLogs],
+      recentActivityFeed: [
+        'ADMIN REGISTRATION: Created user $finalUserCode (${newUser.fullName})${createdVehicle != null ? ' + vehicle ${createdVehicle.vehicleCode}' : ''}',
+        ...state.recentActivityFeed.take(14),
+      ],
+      lastActionBanner:
+          'Registered ${newUser.fullName} ($finalUserCode)${createdVehicle != null ? ' and vehicle ${createdVehicle.vehicleCode}' : ''}. Ready for facial enrollment.',
+    );
+
+    return ApiEnvelope.success(
+      ManualUserRegistrationResponse(
+        userId: newUserId,
+        userCode: finalUserCode,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        roleCode: newUser.roleCode,
+        buildingCode: newUser.buildingCode,
+        vehicleId: createdVehicle?.vehicleId,
+        vehicleCode: createdVehicle?.vehicleCode,
+        plateNumberDisplay: createdVehicle?.plateNumberDisplay,
+        normalizedPlateNumber: createdVehicle?.normalizedPlateNumber,
+        createdAtUtc: now,
+      ),
+    );
+  }
+
+  /// Feature 2a: Fetch Facial Enrollment Status (`GET /api/v1/admin/users/{user_id}/face-enrollment`).
+  ApiEnvelope<FaceEnrollmentStatusDto> getFaceEnrollment({
+    required ProfileDto actor,
+    required String userCodeOrId,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.forbidden,
+        message:
+            'HTTP 403 FORBIDDEN: Role "${actor.role.wireValue}" cannot view facial enrollment metadata.',
+        httpStatus: 403,
+      );
+    }
+
+    final user = state.participantDirectory
+        .where((u) => u.userCode == userCodeOrId || u.userId == userCodeOrId)
+        .firstOrNull;
+    if (user == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'User $userCodeOrId not found in participant directory.',
+        httpStatus: 404,
+      );
+    }
+
+    final status = state.faceEnrollments[user.userCode] ??
+        FaceEnrollmentStatusDto(
+          userId: user.userId,
+          userCode: user.userCode,
+          status: user.faceEnrolled ? 'enrolled' : 'not_enrolled',
+          faceTemplateId: user.faceEnrolled ? user.faceTemplateId : null,
+        );
+    return ApiEnvelope.success(status);
+  }
+
+  /// Feature 2b: Submit RA 10173 Facial Enrollment (`POST /api/v1/admin/users/{user_id}/face-enrollment`).
+  /// Discards raw image bytes immediately after simulated ArcFace embedding extraction.
+  ApiEnvelope<FaceEnrollmentStatusDto> submitFaceEnrollment({
+    required ProfileDto actor,
+    required FaceEnrollmentSubmissionRequest request,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.forbidden,
+        message:
+            'HTTP 403 FORBIDDEN: Role "${actor.role.wireValue}" cannot submit facial enrollment.',
+        httpStatus: 403,
+      );
+    }
+
+    if (!request.consentAccepted) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message:
+            'Explicit RA 10173 biometric enrollment consent is required before submitting face images.',
+        httpStatus: 422,
+        details: {
+          'field': 'consent_accepted',
+          'reason': 'User must sign explicit RA 10173 biometric consent.',
+        },
+      );
+    }
+
+    if (request.framesBase64.isEmpty || request.framesBase64.length > 5) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message:
+            'Please provide between 1 and 5 face images for ArcFace embedding extraction (received ${request.framesBase64.length}).',
+        httpStatus: 422,
+        details: {
+          'field': 'frames',
+          'reason': 'Between 1 and 5 face frames are required.',
+        },
+      );
+    }
+
+    final user = state.participantDirectory
+        .where(
+          (u) => u.userCode == request.userCode || u.userId == request.userId,
+        )
+        .firstOrNull;
+    if (user == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'User ${request.userCode} not found.',
+        httpStatus: 404,
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final seq = _seqCounter++;
+    final newTemplateId =
+        '11000000-0000-4000-8000-${seq.toString().padLeft(12, '0')}';
+
+    final enrolledDto = FaceEnrollmentStatusDto(
+      userId: user.userId,
+      userCode: user.userCode,
+      status: 'enrolled',
+      faceTemplateId: newTemplateId,
+      modelVersion: 'arcface-r100-v1.1',
+      artifactReference: 'vault://biometrics/arcface/${user.userCode}.emb',
+      enrolledAtUtc: now,
+      retentionExpiresAtUtc: now.add(const Duration(days: 365)),
+      consentVersion: request.consentVersion,
+      frameCount: request.framesBase64.length,
+    );
+
+    final updatedDirectory = state.participantDirectory.map((u) {
+      if (u.userCode == user.userCode) {
+        return u.copyWith(
+          faceEnrolled: true,
+          faceTemplateId: newTemplateId,
+        );
+      }
+      return u;
+    }).toList();
+
+    final newAudit = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: 'face_enrolled',
+      resourceType: 'face_template',
+      resourceId: newTemplateId,
+      requestId: 'req-face-$seq',
+      summary:
+          'Admin ${actor.userCode} enrolled ArcFace biometric embedding ($newTemplateId) for ${user.userCode} from ${request.framesBase64.length} frame(s) under ${request.consentVersion}. Raw photos discarded.',
+    );
+
+    state = state.copyWith(
+      participantDirectory: updatedDirectory,
+      faceEnrollments: {
+        ...state.faceEnrollments,
+        user.userCode: enrolledDto,
+      },
+      auditLogs: [newAudit, ...state.auditLogs],
+      recentActivityFeed: [
+        'BIOMETRIC ENROLLMENT: ${user.userCode} (${user.fullName}) enrolled ($newTemplateId · ${request.framesBase64.length} frames · raw images purged)',
+        ...state.recentActivityFeed.take(14),
+      ],
+      lastActionBanner:
+          'Enrolled ArcFace template $newTemplateId for ${user.fullName} (${user.userCode}). Raw photos discarded.',
+    );
+
+    return ApiEnvelope.success(enrolledDto);
+  }
+
+  /// Feature 2c: Revoke & Delete Facial Embedding (`DELETE /api/v1/admin/users/{user_id}/face-enrollment`).
+  ApiEnvelope<FaceEnrollmentStatusDto> deleteFaceEnrollment({
+    required ProfileDto actor,
+    required String userCodeOrId,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.forbidden,
+        message:
+            'HTTP 403 FORBIDDEN: Role "${actor.role.wireValue}" cannot delete facial embeddings.',
+        httpStatus: 403,
+      );
+    }
+
+    final user = state.participantDirectory
+        .where((u) => u.userCode == userCodeOrId || u.userId == userCodeOrId)
+        .firstOrNull;
+    if (user == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'User $userCodeOrId not found.',
+        httpStatus: 404,
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final seq = _seqCounter++;
+    final revokedDto = FaceEnrollmentStatusDto(
+      userId: user.userId,
+      userCode: user.userCode,
+      status: 'not_enrolled',
+      faceTemplateId: null,
+      modelVersion: 'arcface-r100-v1.1',
+      artifactReference: null,
+      enrolledAtUtc: null,
+      retentionExpiresAtUtc: null,
+      consentVersion: 'RA10173-BSU-2026.1',
+      frameCount: 0,
+    );
+
+    final updatedDirectory = state.participantDirectory.map((u) {
+      if (u.userCode == user.userCode) {
+        return u.copyWith(
+          faceEnrolled: false,
+          faceTemplateId: '',
+        );
+      }
+      return u;
+    }).toList();
+
+    final newAudit = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: 'face_enrollment_revoked',
+      resourceType: 'face_template',
+      resourceId: user.userId,
+      requestId: 'req-face-del-$seq',
+      summary:
+          'Admin ${actor.userCode} revoked RA 10173 consent and purged ArcFace biometric embedding for ${user.userCode} (${user.fullName}).',
+    );
+
+    state = state.copyWith(
+      participantDirectory: updatedDirectory,
+      faceEnrollments: {
+        ...state.faceEnrollments,
+        user.userCode: revokedDto,
+      },
+      auditLogs: [newAudit, ...state.auditLogs],
+      recentActivityFeed: [
+        'BIOMETRIC REVOKED: Purged ArcFace embedding for ${user.userCode} (${user.fullName})',
+        ...state.recentActivityFeed.take(14),
+      ],
+      lastActionBanner:
+          'Revoked consent and deleted biometric embedding for ${user.fullName} (${user.userCode}).',
+    );
+
+    return ApiEnvelope.success(revokedDto);
+  }
+
+  void recordRealApiFailure(ApiError error) {
+    state = state.copyWith(
+      lastRealApiError: error,
+      lastActionBanner: 'API Error (${error.code}): ${error.message}',
+    );
+  }
+
+  void clearRealApiFailure() {
+    state = state.copyWith(clearRealApiError: true);
+  }
+
+  /// Resets in-memory state on sign-out or 401/1008 session expiration.
+  void resetSessionState() {
+    if (dataSourceMode == DataSourceMode.real) {
+      state = _buildEmptyRealState(state.rosterMode);
+    } else {
+      state = state.copyWith(clearRealApiError: true);
+    }
+  }
+
+  /// Completely resets state and dataSourceMode back to clean production real mode.
+  void resetToProductionRealMode() {
+    dataSourceMode = DataSourceMode.real;
+    state = _buildEmptyRealState(state.rosterMode);
+  }
+
+  /// Mode-aware passage confirmation (`POST /api/v1/passages/entries` or `/exits` in `real` mode).
+  /// Strictly fails closed in `DATA_SOURCE=real` without falling back to mock state.
+  Future<ApiEnvelope<VisitDto>> confirmVehicleCrossedGateAsync({
+    required String laneId,
+    required String notes,
+    required ProfileDto actor,
+  }) async {
+    if (dataSourceMode == DataSourceMode.mock) {
+      return confirmVehicleCrossedGate(
+        laneId: laneId,
+        notes: notes,
+        actor: actor,
+      );
+    }
+    final trimmed = notes.trim();
+    if (trimmed.length < 10 || trimmed.length > 500) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationFailed,
+        message:
+            'Guard attestation notes must be between 10 and 500 characters (received ${trimmed.length}).',
+        httpStatus: 422,
+      );
+    }
+    final attempt = state.activeLaneAttempts[laneId];
+    final decision = attempt?.latestDecision;
+    if (attempt == null || decision == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'No active gate attempt found on lane $laneId.',
+        httpStatus: 404,
+      );
+    }
+    final repo = gateMonitoringRepository;
+    if (repo == null) {
+      const err = ApiError(
+        code: ErrorCatalog.serviceUnavailable,
+        message: 'GateMonitoringRepository is not configured for real mode.',
+        httpStatus: 503,
+      );
+      recordRealApiFailure(err);
+      return ApiEnvelope.failure(
+        code: err.code,
+        message: err.message,
+        httpStatus: err.httpStatus,
+      );
+    }
+    final req = PassageConfirmationRequest(
+      correlationId: attempt.correlationId,
+      decisionId: decision.decisionId,
+      visitId: attempt.direction == 'exit' ? attempt.committedVisitId : null,
+      gateId: attempt.gateId,
+      laneId: attempt.laneId,
+      direction: attempt.direction,
+      confirmationSource: 'guard_attestation',
+      passageReference: 'attest-${attempt.correlationId}',
+      notes: trimmed,
+    );
+    final res = attempt.direction == 'entry'
+        ? await repo.confirmEntryPassageReal(req)
+        : await repo.confirmExitPassageReal(req);
+    if (!res.ok && res.error != null) {
+      recordRealApiFailure(res.error!);
+      return res;
+    }
+    await refreshRealSnapshot();
+    return res;
+  }
+
+  /// Mode-aware attempt cancellation (`POST /api/v1/access-attempts/{id}/cancel` in `real` mode).
+  Future<ApiEnvelope<AttemptDto>> cancelAttemptBeforePassageAsync(
+    String laneId,
+  ) async {
+    if (dataSourceMode == DataSourceMode.mock) {
+      return cancelAttemptBeforePassage(laneId);
+    }
+    final attempt = state.activeLaneAttempts[laneId];
+    if (attempt == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'No active gate attempt on lane $laneId.',
+        httpStatus: 404,
+      );
+    }
+    final repo = gateMonitoringRepository;
+    if (repo == null) {
+      const err = ApiError(
+        code: ErrorCatalog.serviceUnavailable,
+        message: 'GateMonitoringRepository is not configured.',
+        httpStatus: 503,
+      );
+      recordRealApiFailure(err);
+      return ApiEnvelope.failure(
+        code: err.code,
+        message: err.message,
+        httpStatus: err.httpStatus,
+      );
+    }
+    final res = await repo.cancelAccessAttemptReal(
+      correlationId: attempt.correlationId,
+      reason: 'Cancelled by guard operator prior to physical passage.',
+    );
+    if (!res.ok && res.error != null) {
+      recordRealApiFailure(res.error!);
+      return res;
+    }
+    await refreshRealSnapshot();
+    return res;
+  }
+
+  /// Mode-aware Guard Review submission (`POST /api/v1/guard-reviews` in `real` mode).
+  Future<ApiEnvelope<GuardReviewQueueItem>> submitGuardReviewAsync({
+    required GuardReviewQueueItem item,
+    required String action,
+    required String reason,
+    required int expectedAttemptVersion,
+    required ProfileDto actor,
+  }) async {
+    if (dataSourceMode == DataSourceMode.mock) {
+      return submitGuardReview(
+        reviewCaseId: item.reviewCaseId,
+        action: action,
+        reason: reason,
+        expectedAttemptVersion: expectedAttemptVersion,
+        actor: actor,
+      );
+    }
+    final trimmed = reason.trim();
+    if (trimmed.length < 10 || trimmed.length > 500) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationFailed,
+        message: 'Guard review explanation must be 10–500 characters.',
+        httpStatus: 422,
+      );
+    }
+    if (action == 'approve' && item.isHardSecurityDenial) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.hardDenialOverrideForbidden,
+        message:
+            'Hard security denial (${item.reasonCode}) cannot be overridden to allowed.',
+        httpStatus: 409,
+      );
+    }
+    final repo = guardReviewsRepository;
+    if (repo == null) {
+      const err = ApiError(
+        code: ErrorCatalog.serviceUnavailable,
+        message: 'GuardReviewsRepository is not configured.',
+        httpStatus: 503,
+      );
+      recordRealApiFailure(err);
+      return ApiEnvelope.failure(
+        code: err.code,
+        message: err.message,
+        httpStatus: err.httpStatus,
+      );
+    }
+    final res = await repo.submitGuardReviewReal(
+      GuardReviewSubmission(
+        correlationId: item.correlationId,
+        decisionId: item.decisionId,
+        action: action,
+        reason: trimmed,
+        expectedAttemptVersion: expectedAttemptVersion,
+      ),
+    );
+    if (!res.ok || res.data == null) {
+      if (res.error != null) {
+        recordRealApiFailure(res.error!);
+      }
+      return ApiEnvelope.failure(
+        code: res.error?.code ?? ErrorCatalog.serviceUnavailable,
+        message: res.error?.message ?? 'Guard review submission failed.',
+        httpStatus: res.error?.httpStatus ?? 503,
+        details: res.error?.details,
+      );
+    }
+    await refreshRealSnapshot();
+    final updatedItem = GuardReviewQueueItem.fromJson(res.data!);
+    return ApiEnvelope.success(updatedItem);
+  }
+
+  /// Fetches live snapshots from FastAPI when `DATA_SOURCE=real`.
+  /// Strictly fails closed on any endpoint failure without falling back to mock data.
+  Future<void> refreshRealSnapshot() async {
+    if (dataSourceMode != DataSourceMode.real) return;
+
+    if (parkingRepository != null) {
+      final spacesRes = await parkingRepository!.fetchParkingAvailabilityReal();
+      if (!spacesRes.ok && spacesRes.error != null) {
+        recordRealApiFailure(spacesRes.error!);
+        return;
+      }
+      if (spacesRes.data != null) {
+        state = state.copyWith(spaces: spacesRes.data, clearRealApiError: true);
+      }
+    }
+
+    if (gateMonitoringRepository != null) {
+      final attemptsRes =
+          await gateMonitoringRepository!.fetchAccessAttemptsReal();
+      if (!attemptsRes.ok && attemptsRes.error != null) {
+        recordRealApiFailure(attemptsRes.error!);
+        return;
+      }
+      if (attemptsRes.data != null) {
+        final lanes = <String, AttemptDto>{};
+        for (final a in attemptsRes.data!) {
+          lanes.putIfAbsent(a.laneId, () => a);
+        }
+        state = state.copyWith(
+          activeLaneAttempts: lanes,
+          attemptHistory: attemptsRes.data,
+          clearRealApiError: true,
+        );
+      }
+    }
+
+    if (guardReviewsRepository != null) {
+      final reviewsRes = await guardReviewsRepository!.fetchGuardReviewsReal();
+      if (!reviewsRes.ok && reviewsRes.error != null) {
+        recordRealApiFailure(reviewsRes.error!);
+        return;
+      }
+      if (reviewsRes.data != null) {
+        state = state.copyWith(
+          reviewQueue: reviewsRes.data,
+          clearRealApiError: true,
+        );
+      }
+    }
+
+    if (accessLogsRepository != null) {
+      final visitsRes = await accessLogsRepository!.fetchCampusVisitsReal();
+      if (!visitsRes.ok && visitsRes.error != null) {
+        recordRealApiFailure(visitsRes.error!);
+        return;
+      }
+      if (visitsRes.data != null) {
+        state = state.copyWith(visits: visitsRes.data, clearRealApiError: true);
+      }
+    }
+
+    if (deviceMonitoringRepository != null) {
+      final devsRes = await deviceMonitoringRepository!.fetchDevicesReal();
+      if (!devsRes.ok && devsRes.error != null) {
+        recordRealApiFailure(devsRes.error!);
+        return;
+      }
+      if (devsRes.data != null) {
+        state = state.copyWith(devices: devsRes.data, clearRealApiError: true);
+      }
+    }
+  }
+
   /// Simulates WebSocket lag/disconnect (`T18`) or reconnect resync (`§7.11`).
   void toggleSimulatedOfflineLag() {
     if (state.wsState.isHealthy) {
@@ -2051,6 +3002,10 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
   }
 
   void forceFullSnapshotResync() {
+    if (dataSourceMode == DataSourceMode.real) {
+      refreshRealSnapshot();
+      return;
+    }
     wsCoordinator.reconnectAndResync();
     state = state.copyWith(
       wsState: wsCoordinator.state,

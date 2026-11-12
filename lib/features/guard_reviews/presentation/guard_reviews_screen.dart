@@ -32,6 +32,7 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
   int? _capturedExpectedVersion;
   String? _submissionFeedback;
   bool _submissionIsError = false;
+  bool _isSubmittingReview = false;
 
   @override
   void dispose() {
@@ -48,20 +49,33 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
     });
   }
 
-  void _submitReviewAction(GuardReviewQueueItem item, String action) {
+  Future<void> _submitReviewAction(
+    GuardReviewQueueItem item,
+    String action,
+  ) async {
+    if (_isSubmittingReview) return;
+    setState(() {
+      _isSubmittingReview = true;
+      _submissionFeedback = null;
+      _submissionIsError = false;
+    });
+
     final actor = ref.read(authControllerProvider).profile ??
         SentryFixtures.guardOperator;
     final expectedVer = _capturedExpectedVersion ?? item.currentAttemptVersion;
 
-    final result = ref.read(sentryScenarioProvider.notifier).submitGuardReview(
-          reviewCaseId: item.reviewCaseId,
-          action: action,
-          reason: _reasonCtrl.text,
-          expectedAttemptVersion: expectedVer,
-          actor: actor,
-        );
+    final result =
+        await ref.read(sentryScenarioProvider.notifier).submitGuardReviewAsync(
+              item: item,
+              action: action,
+              reason: _reasonCtrl.text,
+              expectedAttemptVersion: expectedVer,
+              actor: actor,
+            );
 
+    if (!mounted) return;
     setState(() {
+      _isSubmittingReview = false;
       if (result.ok) {
         _submissionIsError = false;
         _submissionFeedback =
@@ -86,14 +100,16 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
       return true;
     }).toList();
 
-    final selectedItem = filteredQueue.firstWhere(
-      (r) => r.reviewCaseId == _selectedCaseId,
-      orElse: () => filteredQueue.isNotEmpty
-          ? filteredQueue.first
-          : sysState.reviewQueue.first,
-    );
-    _capturedExpectedVersion ??= selectedItem.currentAttemptVersion;
-    final canApprove = selectedItem.canApprove();
+    final selectedItem = filteredQueue
+            .where((r) => r.reviewCaseId == _selectedCaseId)
+            .firstOrNull ??
+        filteredQueue.firstOrNull ??
+        sysState.reviewQueue.firstOrNull;
+    if (selectedItem != null) {
+      _capturedExpectedVersion ??= selectedItem.currentAttemptVersion;
+    }
+    final canApprove =
+        selectedItem != null && selectedItem.canApprove() && !_isSubmittingReview;
 
     return ScreenScaffold(
       children: [
@@ -121,11 +137,17 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (filteredQueue.isEmpty)
-                  const SentryCard(
+                  SentryCard(
                     child: EmptyState(
                       icon: Icons.check_circle_outline_rounded,
-                      title: 'No cases in this view',
-                      message: 'All matching review cases have been handled.',
+                      title: sysState.reviewQueue.isEmpty
+                          ? 'No pending guard reviews'
+                          : (_filterIndex == 2
+                              ? 'No resolved cases'
+                              : 'No cases in this view'),
+                      message: sysState.reviewQueue.isEmpty
+                          ? 'Gate encounters requiring manual guard verification will appear here automatically.'
+                          : 'All matching review cases have been handled.',
                     ),
                   )
                 else
@@ -135,8 +157,9 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                       index: i + 1,
                       child: _ReviewCaseCard(
                         item: filteredQueue[i],
-                        selected: filteredQueue[i].reviewCaseId ==
-                            selectedItem.reviewCaseId,
+                        selected: selectedItem != null &&
+                            filteredQueue[i].reviewCaseId ==
+                                selectedItem.reviewCaseId,
                         onTap: () => _selectCase(filteredQueue[i]),
                       ),
                     ),
@@ -144,16 +167,25 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
               ],
             );
 
-            final inspectorCard = SmoothSwitcher(
-              switchKey:
-                  '${selectedItem.reviewCaseId}-${selectedItem.currentAttemptVersion}-${selectedItem.isResolved}',
-              child: _buildInspectorCard(
-                context,
-                p,
-                selectedItem,
-                canApprove,
-              ),
-            );
+            final inspectorCard = selectedItem == null
+                ? const SentryCard(
+                    child: EmptyState(
+                      icon: Icons.fact_check_outlined,
+                      title: 'No review case selected',
+                      message:
+                          'Uncertain gate encounters will appear here for guard verification.',
+                    ),
+                  )
+                : SmoothSwitcher(
+                    switchKey:
+                        '${selectedItem.reviewCaseId}-${selectedItem.currentAttemptVersion}-${selectedItem.isResolved}',
+                    child: _buildInspectorCard(
+                      context,
+                      p,
+                      selectedItem,
+                      canApprove,
+                    ),
+                  );
 
             if (constraints.maxWidth < 960) {
               return Column(
@@ -195,56 +227,26 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 10,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  PlateBadge(
-                    plateText: selectedItem.plateText,
-                    rfidUid: selectedItem.rfidUid,
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _humanReasonTitle(selectedItem.reasonCode),
-                        style: SentryTheme.display(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: p.text,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${selectedItem.reviewCaseId} · ${_laneLabel(selectedItem.laneId)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Wrap(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 640;
+              final buttons = Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  OutlinedButton.icon(
-                    key: const Key('simulate_stale_version_button'),
-                    onPressed: () {
-                      ref
-                          .read(sentryScenarioProvider.notifier)
-                          .simulateConcurrentVersionBump(
-                            selectedItem.reviewCaseId,
-                          );
-                    },
-                    icon: const Icon(Icons.sync_problem_outlined, size: 17),
-                    label: const Text('Test version conflict'),
-                  ),
+                  if (ref.watch(appConfigProvider).isMock)
+                    OutlinedButton.icon(
+                      key: const Key('simulate_stale_version_button'),
+                      onPressed: () {
+                        ref
+                            .read(sentryScenarioProvider.notifier)
+                            .simulateConcurrentVersionBump(
+                              selectedItem.reviewCaseId,
+                            );
+                      },
+                      icon: const Icon(Icons.sync_problem_outlined, size: 17),
+                      label: const Text('Test version conflict'),
+                    ),
                   IconButton(
                     tooltip: 'Inspect raw IDs and evidence envelope',
                     onPressed: () =>
@@ -252,8 +254,52 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                     icon: const Icon(Icons.info_outline_rounded),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PlateBadge(
+                        plateText: selectedItem.plateText,
+                        rfidUid: selectedItem.rfidUid,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _humanReasonTitle(selectedItem.reasonCode),
+                              style: SentryTheme.display(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: p.text,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${selectedItem.reviewCaseId} · ${_laneLabel(selectedItem.laneId)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isNarrow) ...[
+                        const SizedBox(width: 12),
+                        buttons,
+                      ],
+                    ],
+                  ),
+                  if (isNarrow) ...[
+                    const SizedBox(height: 12),
+                    buttons,
+                  ],
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 16),
@@ -397,7 +443,7 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
               ),
               OutlinedButton.icon(
                 key: const Key('guard_review_deny_button'),
-                onPressed: selectedItem.isResolved
+                onPressed: selectedItem.isResolved || _isSubmittingReview
                     ? null
                     : () => _submitReviewAction(selectedItem, 'deny'),
                 icon: const Icon(Icons.block_outlined, size: 18),
@@ -405,7 +451,7 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
               ),
               OutlinedButton.icon(
                 key: const Key('guard_review_escalate_button'),
-                onPressed: selectedItem.isResolved
+                onPressed: selectedItem.isResolved || _isSubmittingReview
                     ? null
                     : () => _submitReviewAction(selectedItem, 'escalate'),
                 icon: const Icon(Icons.flag_outlined, size: 18),

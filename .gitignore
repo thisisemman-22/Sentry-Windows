@@ -10,7 +10,8 @@
 .svn/
 migrate_working_dir/
 
-# IntelliJ related
+# IDE related
+.vscode/
 *.iml
 *.ipr
 *.iws
@@ -43,3 +44,8 @@ app.*.map.json
 .env
 config/local.json
 config/demo.json
+
+# Release archives (distributed via GitHub Releases)
+*.zip
+*.apk
+*.exe

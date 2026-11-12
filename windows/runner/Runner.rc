@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "campus_parking_desktop" "\0"
+            VALUE "CompanyName", "Batangas State University - The National Engineering University" "\0"
+            VALUE "FileDescription", "SENTRY - Smart Campus Access & Parking Management System" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "campus_parking_desktop" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "campus_parking_desktop.exe" "\0"
-            VALUE "ProductName", "campus_parking_desktop" "\0"
+            VALUE "InternalName", "SENTRY" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 BatStateU TNEU. All rights reserved." "\0"
+            VALUE "OriginalFilename", "SENTRY.exe" "\0"
+            VALUE "ProductName", "SENTRY" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

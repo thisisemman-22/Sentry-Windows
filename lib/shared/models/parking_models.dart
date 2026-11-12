@@ -103,6 +103,40 @@ class SpaceDto {
     );
   }
 
+  factory SpaceDto.fromJson(Map<String, dynamic> json) {
+    final distMap = <String, int>{};
+    final rawDist = json['building_distance_meters'];
+    if (rawDist is Map) {
+      rawDist.forEach((k, v) {
+        if (k != null && v is num) {
+          distMap[k.toString()] = v.toInt();
+        }
+      });
+    }
+    return SpaceDto(
+      spaceId: json['space_id']?.toString() ?? '',
+      spaceCode: json['space_code']?.toString() ?? '',
+      lotCode: json['lot_code']?.toString() ?? 'A',
+      compatibility: json['compatibility']?.toString() ?? 'car_only',
+      physicalStatus: json['physical_status']?.toString() ?? 'unknown',
+      allocationStatus: json['allocation_status']?.toString() ?? 'unassigned',
+      confidence: (json['confidence'] as num?)?.toDouble(),
+      lastObservedAtUtc: json['last_observed_at'] != null
+          ? DateTime.tryParse(json['last_observed_at'].toString())?.toUtc()
+          : null,
+      isStale: json['is_stale'] == true,
+      producerId: json['producer_id']?.toString(),
+      assignmentId: json['assignment_id']?.toString(),
+      visitId: json['visit_id']?.toString(),
+      assignedVehicleCode: json['assigned_vehicle_code']?.toString(),
+      assignedUserCode: json['assigned_user_code']?.toString(),
+      holdExpiresAtUtc: json['hold_expires_at'] != null
+          ? DateTime.tryParse(json['hold_expires_at'].toString())?.toUtc()
+          : null,
+      buildingDistanceMeters: distMap,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'space_id': spaceId,
         'space_code': spaceCode,
@@ -218,4 +252,15 @@ class BuildingPriorityRow {
     required this.buildingName,
     required this.orderedLots,
   });
+
+  factory BuildingPriorityRow.fromJson(Map<String, dynamic> json) {
+    final lots = json['ordered_lots'] ?? json['lots'];
+    return BuildingPriorityRow(
+      buildingCode: json['building_code']?.toString() ?? '',
+      buildingName: json['building_name']?.toString() ?? '',
+      orderedLots: lots is List
+          ? lots.map((e) => e.toString()).toList()
+          : const ['A', 'B', 'C', 'D'],
+    );
+  }
 }

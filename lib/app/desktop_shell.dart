@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/motion/motion.dart';
 import '../core/network/api_envelope.dart';
+import '../core/network/ws_client.dart';
 import '../core/theme/sentry_colors.dart';
 import '../core/theme/sentry_theme.dart';
 import '../core/widgets/sentry_interactive_logo.dart';
@@ -36,6 +36,17 @@ class DesktopShell extends ConsumerStatefulWidget {
 class _DesktopShellState extends ConsumerState<DesktopShell> {
   DesktopNavTab _previousTab = DesktopNavTab.overview;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (ref.read(appConfigProvider).isReal) {
+        ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
+      }
+    });
+  }
+
   void _go(DesktopNavTab tab) {
     _previousTab = ref.read(selectedDesktopTabProvider);
     ref.read(selectedDesktopTabProvider.notifier).state = tab;
@@ -45,6 +56,12 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final mode = ref.read(themeModeProvider);
     ref.read(themeModeProvider.notifier).state =
         mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+  }
+
+  void _unlockDevMode() {
+    ref.read(devModeUnlockedProvider.notifier).state = true;
+    ref.read(sentryScenarioProvider.notifier).enableDeveloperMockMode();
+    showSentryToast(context, 'Developer Test Mode Enabled', tone: PillTone.ok);
   }
 
   @override
@@ -78,24 +95,44 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
           ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
       const SingleActivator(LogicalKeyboardKey.keyL,
           control: true, shift: true): _toggleTheme,
+      const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+          showCommandPalette(context, ref),
+      const SingleActivator(
+        LogicalKeyboardKey.keyD,
+        control: true,
+        shift: true,
+        alt: true,
+      ): _unlockDevMode,
     };
 
     final forward = activeTab.index >= _previousTab.index;
     final isMobile = MediaQuery.sizeOf(context).width < 760;
 
-    final pageSwitcher = PageTransitionSwitcher(
-      duration: SentryMotion.of(context, const Duration(milliseconds: 520)),
-      reverse: !forward,
-      transitionBuilder: (child, primary, secondary) => SharedAxisTransition(
-        animation: primary,
-        secondaryAnimation: secondary,
-        transitionType: SharedAxisTransitionType.vertical,
-        fillColor: p.bg,
-        child: child,
+    // Fast, calm view transition: 220ms fade + 1.5% horizontal slide.
+    final pageSwitcher = AnimatedSwitcher(
+      duration: SentryMotion.of(context, const Duration(milliseconds: 220)),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: Offset(forward ? 0.015 : -0.015, 0),
+            end: Offset.zero,
+          ).animate(anim),
+          child: child,
+        ),
+      ),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topLeft,
+        children: [...previous, if (current != null) current],
       ),
       child: KeyedSubtree(
         key: ValueKey(activeTab),
-        child: DesktopViewRouter(tab: activeTab),
+        child: ColoredBox(
+          color: p.bg,
+          child: DesktopViewRouter(tab: activeTab),
+        ),
       ),
     );
 
@@ -188,7 +225,9 @@ class _Sidebar extends ConsumerWidget {
     final p = SentryPalette.of(context);
     final kpis = ref.watch(
         sentryScenarioProvider.select((s) => s.computeDashboardKpis()));
-    final profile = ref.watch(authControllerProvider).profile!;
+    final authState = ref.watch(authControllerProvider);
+    final profile = authState.profile;
+    if (profile == null) return const SizedBox.shrink();
     final width = collapsed ? 88.0 : 256.0;
 
     return AnimatedContainer(
@@ -212,7 +251,7 @@ class _Sidebar extends ConsumerWidget {
                 padding: EdgeInsets.fromLTRB(collapsed ? 24 : 22, 22, 14, 22),
                 child: Row(
                   children: [
-                    const SentryInteractiveLogo(size: 40),
+                    const SentryInteractiveLogo(size: 34),
                     if (!collapsed) ...[
                       const SizedBox(width: 12),
                       Expanded(
@@ -239,8 +278,11 @@ class _Sidebar extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Alangilan Campus',
-                              style: Theme.of(context).textTheme.bodySmall,
+                              'BATSTATEU TNEU · ALANGILAN',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SentryTheme.eyebrow(color: p.muted)
+                                  .copyWith(fontSize: 9.5),
                             ),
                           ],
                         ),
@@ -256,7 +298,12 @@ class _Sidebar extends ConsumerWidget {
                   child: ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     children: [
-                      for (final tab in DesktopNavTab.values)
+                      for (final tab in DesktopNavTab.values) ...[
+                        if (_sectionLabelFor(tab) != null)
+                          _NavSectionLabel(
+                            label: _sectionLabelFor(tab)!,
+                            collapsed: collapsed,
+                          ),
                         _NavItem(
                           key: Key('nav_tab_${tab.name}'),
                           tab: tab,
@@ -276,6 +323,7 @@ class _Sidebar extends ConsumerWidget {
                               : PillTone.warn,
                           onTap: () => onSelect(tab),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -308,6 +356,157 @@ class _Sidebar extends ConsumerWidget {
               _OperatorChip(profile: profile, collapsed: collapsed),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+String? _sectionLabelFor(DesktopNavTab tab) => switch (tab) {
+      DesktopNavTab.overview => 'OPERATIONS',
+      DesktopNavTab.accessLogs => 'RECORDS & HARDWARE',
+      DesktopNavTab.administration => 'SYSTEM',
+      _ => null,
+    };
+
+class _NavSectionLabel extends StatelessWidget {
+  final String label;
+  final bool collapsed;
+  const _NavSectionLabel({required this.label, required this.collapsed});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    if (collapsed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+        child: Divider(height: 1, color: p.line),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 16, 8, 8),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: SentryTheme.eyebrow(color: p.muted),
+      ),
+    );
+  }
+}
+
+/// `Ctrl+K` command palette: jump to any view, a registered driver, or a plate.
+Future<void> showCommandPalette(BuildContext context, WidgetRef ref) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => _CommandPalette(parentRef: ref),
+  );
+}
+
+class _CommandPalette extends ConsumerStatefulWidget {
+  final WidgetRef parentRef;
+  const _CommandPalette({required this.parentRef});
+
+  @override
+  ConsumerState<_CommandPalette> createState() => _CommandPaletteState();
+}
+
+class _CommandPaletteState extends ConsumerState<_CommandPalette> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    final sys = ref.watch(sentryScenarioProvider);
+    final q = _q.trim().toUpperCase();
+    final views = DesktopNavTab.values
+        .where((t) => q.isEmpty || t.title.toUpperCase().contains(q))
+        .toList();
+    final people = q.isEmpty
+        ? const []
+        : sys.participantDirectory.where((u) {
+            final plates = u.vehicles
+                .map((v) => (v.plateNumberDisplay ?? '').toUpperCase())
+                .join(' ');
+            return u.userCode.contains(q) ||
+                u.fullName.toUpperCase().contains(q) ||
+                plates.contains(q) ||
+                plates.replaceAll(' ', '').contains(q.replaceAll(' ', ''));
+          }).take(6).toList();
+
+    void go(DesktopNavTab tab) {
+      ref.read(selectedDesktopTabProvider.notifier).state = tab;
+      Navigator.of(context).pop();
+    }
+
+    return Dialog(
+      alignment: const Alignment(0, -0.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                key: const Key('command_palette_field'),
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded, size: 20),
+                  hintText: 'Jump to a view, driver, or license plate…',
+                ),
+                onChanged: (v) => setState(() => _q = v),
+                onSubmitted: (_) {
+                  if (views.isNotEmpty) go(views.first);
+                },
+              ),
+            ),
+            Divider(height: 1, color: p.line),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  for (final t in views)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(t.icon, size: 20),
+                      title: Text(t.title),
+                      subtitle: Text(t.subtitle,
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      trailing: Text('Ctrl+${t.index + 1}',
+                          style: SentryTheme.mono(fontSize: 12, color: p.muted)),
+                      onTap: () => go(t),
+                    ),
+                  for (final u in people)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.badge_outlined, size: 20),
+                      title: Text('${u.fullName} (${u.userCode})',
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        u.vehicles
+                            .map((v) => v.plateNumberDisplay ?? v.vehicleCode)
+                            .join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => go(DesktopNavTab.accessLogs),
+                    ),
+                  if (views.isEmpty && people.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text('No matches',
+                          style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -491,14 +690,86 @@ class _OperatorChip extends ConsumerWidget {
     return (first + last).toUpperCase();
   }
 
+  void _showAboutSentry(BuildContext context) {
+    final p = SentryPalette.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: p.line),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            const SentryInteractiveLogo(size: 72),
+            const SizedBox(height: 18),
+            Text.rich(
+              TextSpan(
+                children: const [
+                  TextSpan(text: 'SENT'),
+                  TextSpan(
+                    text: 'RY',
+                    style: TextStyle(color: SentryColors.crimson),
+                  ),
+                ],
+                style: SentryTheme.display(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'BatStateU TNEU · Alangilan Campus',
+              style: SentryTheme.eyebrow(color: p.crimson),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Smart Campus Access & Real-Time Parking Management System',
+              textAlign: TextAlign.center,
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    color: p.slate,
+                    height: 1.4,
+                  ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: p.subtle,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: p.line),
+              ),
+              child: Text(
+                'v1.0.0 · Production Release · RA 10173 Compliant',
+                style: SentryTheme.mono(fontSize: 11.5, color: p.muted),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = SentryPalette.of(context);
     final isAdmin = profile.role.isAdmin;
 
     final avatar = Container(
-      width: 40,
-      height: 40,
+      width: 36,
+      height: 36,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: isAdmin ? p.text : SentryColors.crimson,
@@ -507,7 +778,7 @@ class _OperatorChip extends ConsumerWidget {
       child: Text(
         _initials,
         style: SentryTheme.display(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w800,
           color: isAdmin ? p.card : Colors.white,
           letterSpacing: 0.5,
@@ -527,6 +798,12 @@ class _OperatorChip extends ConsumerWidget {
         ),
         menuChildren: [
           MenuItemButton(
+            leadingIcon: const Icon(Icons.info_outline_rounded),
+            onPressed: () => _showAboutSentry(context),
+            child: const Text('About SENTRY'),
+          ),
+          const Divider(height: 8),
+          MenuItemButton(
             leadingIcon: const Icon(Icons.logout_rounded),
             onPressed: () =>
                 ref.read(authControllerProvider.notifier).signOut(),
@@ -534,7 +811,7 @@ class _OperatorChip extends ConsumerWidget {
           ),
         ],
         builder: (context, controller, _) => Tooltip(
-          message: collapsed ? '${profile.fullName} · ${_roleLabel()}' : '',
+          message: '${profile.fullName} · ${_roleLabel()}',
           child: Material(
             color: p.subtle,
             borderRadius: BorderRadius.circular(18),
@@ -543,32 +820,39 @@ class _OperatorChip extends ConsumerWidget {
               onTap: () =>
                   controller.isOpen ? controller.close() : controller.open(),
               child: Padding(
-                padding: EdgeInsets.all(collapsed ? 12 : 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: collapsed ? 8 : 10,
+                  vertical: collapsed ? 10 : 8,
+                ),
                 child: collapsed
                     ? Center(child: avatar)
                     : Row(
                         children: [
                           avatar,
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   profile.fullName,
                                   maxLines: 1,
+                                  softWrap: false,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.titleSmall,
                                 ),
                                 Text(
                                   _roleLabel(),
                                   maxLines: 1,
+                                  softWrap: false,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(width: 4),
                           Icon(Icons.unfold_more_rounded,
                               size: 18, color: p.muted),
                         ],
@@ -600,10 +884,11 @@ class _TopBar extends ConsumerWidget {
     final ws = ref.watch(sentryScenarioProvider.select((s) => s.wsState));
     final config = ref.watch(appConfigProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final wide = MediaQuery.sizeOf(context).width >= 1180;
 
     return Container(
-      height: 68,
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 28),
+      height: 56,
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: p.bg,
         border: Border(bottom: BorderSide(color: p.line)),
@@ -622,36 +907,88 @@ class _TopBar extends ConsumerWidget {
           ],
           Flexible(
             child: _ConnectionStatus(
-              healthy: ws.isHealthy,
-              lastSyncUtc: isMobile ? null : ws.lastSyncedAtUtc,
+              wsState: ws,
+              isMobile: isMobile,
               onResync: () => ref
                   .read(sentryScenarioProvider.notifier)
                   .forceFullSnapshotResync(),
             ),
           ),
           const Spacer(),
-          if (!isMobile) ...[
-            const _ManilaClock(),
-            const SizedBox(width: 10),
-          ],
-          if (config.isMock) ...[
+          Tooltip(
+            message: 'Quick jump (Ctrl+K)',
+            child: isMobile
+                ? IconButton(
+                    key: const Key('open_command_palette_button'),
+                    onPressed: () => showCommandPalette(context, ref),
+                    icon: const Icon(Icons.search_rounded),
+                  )
+                : OutlinedButton.icon(
+                    key: const Key('open_command_palette_button'),
+                    onPressed: () => showCommandPalette(context, ref),
+                    icon: const Icon(Icons.search_rounded, size: 18),
+                    label: Text(wide ? 'Search  ·  Ctrl+K' : 'Ctrl+K'),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          // When in Developer Test Mode (isMock), show the DEV pill that opens demo controls.
+          // In production mode (real), show only the calm Manila clock with no demo triggers.
+          if (config.isMock)
             Tooltip(
-              message: 'Run demo scenarios and switch roster or role',
-              child: isMobile
-                  ? IconButton(
-                      key: const Key('open_demo_controls_button'),
-                      onPressed: () => showDemoControlsSheet(context),
-                      icon: const Icon(Icons.science_outlined),
-                    )
-                  : OutlinedButton.icon(
-                      key: const Key('open_demo_controls_button'),
-                      onPressed: () => showDemoControlsSheet(context),
-                      icon: const Icon(Icons.science_outlined, size: 18),
-                      label: const Text('Demo tools'),
-                    ),
+              message: 'Developer test mode · open simulator tools',
+              child: InkWell(
+                key: const Key('open_demo_controls_button'),
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => showDemoControlsSheet(context),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: p.subtle,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: p.line),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: p.warn,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'DEV',
+                        style: SentryTheme.mono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: p.text,
+                        ),
+                      ),
+                      if (!isMobile) ...[
+                        const SizedBox(width: 10),
+                        const _ManilaClock(),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (!isMobile)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: p.subtle,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: p.line),
+              ),
+              child: const _ManilaClock(),
             ),
-            const SizedBox(width: 6),
-          ],
+          const SizedBox(width: 4),
           IconButton(
             key: const Key('sidebar_theme_toggle'),
             tooltip: themeMode == ThemeMode.dark
@@ -679,68 +1016,91 @@ class _TopBar extends ConsumerWidget {
 }
 
 class _ConnectionStatus extends StatelessWidget {
-  final bool healthy;
-  final DateTime? lastSyncUtc;
+  final WsStreamState wsState;
   final VoidCallback onResync;
+  final bool isMobile;
 
   const _ConnectionStatus({
-    required this.healthy,
-    required this.lastSyncUtc,
+    required this.wsState,
     required this.onResync,
+    this.isMobile = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    final color = healthy ? p.ok : p.warn;
-    final text = healthy ? p.okText : p.warnText;
+    final status = wsState.status;
+    final isConnected = status == WsConnectionStatus.connected;
+    final isReconnecting = status == WsConnectionStatus.reconnecting;
+    final color = isConnected
+        ? p.ok
+        : isReconnecting
+            ? p.warn
+            : p.err;
+    final tint = isConnected
+        ? p.okTint
+        : isReconnecting
+            ? p.warnTint
+            : p.errTint;
+    final text = isConnected
+        ? p.okText
+        : isReconnecting
+            ? p.warnText
+            : p.errText;
+    final label = isConnected
+        ? 'Connected'
+        : isReconnecting
+            ? 'Reconnecting'
+            : 'Offline';
 
     return Semantics(
       liveRegion: true,
-      label: healthy
-          ? 'Live. Data is up to date.'
-          : 'Data may be out of date. Resync available.',
+      label: 'Backend status: $label.',
       child: AnimatedContainer(
         duration: SentryMotion.of(context, SentryMotion.medium),
         curve: SentryMotion.emphasized,
-        padding: const EdgeInsets.fromLTRB(4, 4, 14, 4),
+        padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
         decoration: BoxDecoration(
-          color: healthy ? p.okTint : p.warnTint,
+          color: tint,
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PulseDot(color: color, pulsing: healthy),
-            Text(
-              healthy ? 'Live' : 'Out of date',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: text,
-              ),
-            ),
-            if (lastSyncUtc != null) ...[
-              const SizedBox(width: 8),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PulseDot(color: color, pulsing: isConnected),
               Text(
-                'synced ${ManilaTime.formatTimeOnly(lastSyncUtc)}',
-                style: TextStyle(fontSize: 13, color: text.withValues(alpha: 0.8)),
-              ),
-            ],
-            if (!healthy) ...[
-              const SizedBox(width: 10),
-              TextButton.icon(
-                onPressed: onResync,
-                style: TextButton.styleFrom(
-                  foregroundColor: text,
-                  minimumSize: const Size(0, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: text,
                 ),
-                icon: const Icon(Icons.refresh_rounded, size: 17),
-                label: const Text('Resync'),
               ),
+              if (!isMobile && wsState.lastSyncedAtUtc != null && isConnected) ...[
+                const SizedBox(width: 6),
+                Text(
+                  'synced ${ManilaTime.formatTimeOnly(wsState.lastSyncedAtUtc)}',
+                  style: TextStyle(fontSize: 12, color: text.withValues(alpha: 0.8)),
+                ),
+              ],
+              if (!isMobile && !isConnected) ...[
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: onResync,
+                  style: TextButton.styleFrom(
+                    foregroundColor: text,
+                    minimumSize: const Size(0, 28),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  icon: const Icon(Icons.refresh_rounded, size: 15),
+                  label: const Text('Resync'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -776,18 +1136,10 @@ class _ManilaClockState extends State<_ManilaClock> {
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    return Tooltip(
-      message: 'Philippine Standard Time (Asia/Manila, UTC+8)',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.schedule_rounded, size: 18, color: p.muted),
-          const SizedBox(width: 8),
-          Text(
-            ManilaTime.formatDateTime(_now),
-            style: SentryTheme.mono(fontSize: 13.5, color: p.slate),
-          ),
-        ],
+    return Text(
+      ManilaTime.formatTimeOnly(_now),
+      style: SentryTheme.mono(fontSize: 12.5, color: p.slate).copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
   }

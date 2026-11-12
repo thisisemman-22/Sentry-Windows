@@ -1,9 +1,10 @@
 {
-  "APP_ENV": "local",
-  "DATA_SOURCE": "mock",
+  "_comment": "TODO(API): Replace API_URL_PLACEHOLDER with Patrick's live FastAPI LAN/Tunnel URL",
+  "APP_ENV": "production",
+  "DATA_SOURCE": "real",
   "ROSTER_MODE": "class_demo",
-  "API_BASE_URL": "http://127.0.0.1:8000",
-  "WS_BASE_URL": "ws://127.0.0.1:8000/api/v1/ws/updates",
+  "API_BASE_URL": "https://API_URL_PLACEHOLDER.local:8000",
+  "WS_BASE_URL": "wss://API_URL_PLACEHOLDER.local:8000/api/v1/ws/updates",
   "REQUEST_TIMEOUT_MS": 5000,
   "DISPLAY_TIMEZONE": "Asia/Manila"
 }

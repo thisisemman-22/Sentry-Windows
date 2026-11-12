@@ -1,15 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_config.dart';
+import '../core/network/api_client.dart';
 import '../core/network/secure_session_store.dart';
 import '../core/network/ws_client.dart';
+import '../features/access_logs/data/access_logs_repository.dart';
+import '../features/administration/data/administration_repository.dart';
+import '../features/authentication/data/auth_repository.dart';
+import '../features/device_monitoring/data/device_monitoring_repository.dart';
+import '../features/guard_reviews/data/guard_reviews_repository.dart';
+import '../features/live_gate_monitoring/data/gate_monitoring_repository.dart';
+import '../features/overview/state/overview_providers.dart';
+import '../features/parking_management/data/parking_repository.dart';
 import '../shared/fixtures/scenario_simulator.dart';
 import '../shared/fixtures/synthetic_fixtures.dart';
 import '../shared/models/auth_models.dart';
 
+/// Runtime toggle for Developer Test Mode (unlocked via secret credentials,
+/// 5x logo tap within 2s, or `Ctrl+Shift+Alt+D`).
+final devModeUnlockedProvider = StateProvider<bool>((ref) => false);
+
 /// Root compile-time/runtime configuration provider.
+/// Defaults to `DATA_SOURCE=real` (`AppConfig.fromEnvironment()`), and switches
+/// to `DataSourceMode.mock` in memory when `devModeUnlockedProvider` is unlocked.
 final appConfigProvider = Provider<AppConfig>((ref) {
-  return AppConfig.fromEnvironment();
+  final base = AppConfig.fromEnvironment();
+  final devUnlocked = ref.watch(devModeUnlockedProvider);
+  if (devUnlocked) {
+    return base.copyWith(dataSource: DataSourceMode.mock);
+  }
+  return base;
 });
 
 /// Global ThemeMode provider (Light Mode vs. Pure OLED Dark Command Mode).
@@ -31,6 +51,80 @@ final wsCoordinatorProvider = Provider<WsInvalidationCoordinator>((ref) {
   final coord = WsInvalidationCoordinator();
   ref.onDispose(coord.dispose);
   return coord;
+});
+
+/// Centralized HTTP API Client (`lib/core/network/api_client.dart`).
+final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final sessionStore = ref.watch(sessionStoreProvider);
+  final wsCoordinator = ref.watch(wsCoordinatorProvider);
+  return ApiClient(
+    config: config,
+    sessionStore: sessionStore,
+    onSessionExpired: (reason) {
+      wsCoordinator.handleCloseCode1008(reason);
+    },
+  );
+});
+
+/// Real WebSocket Client (`lib/core/network/ws_client.dart`) for `/api/v1/ws/updates`.
+final Provider<WsRealtimeClient> wsRealtimeClientProvider =
+    Provider<WsRealtimeClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final sessionStore = ref.watch(sessionStoreProvider);
+  final coordinator = ref.watch(wsCoordinatorProvider);
+  final client = WsRealtimeClient(
+    config: config,
+    sessionStore: sessionStore,
+    coordinator: coordinator,
+    onTargetedInvalidation: (_) {
+      ref.read(sentryScenarioProvider.notifier).forceFullSnapshotResync();
+    },
+    onFullResyncRequired: (_) {
+      ref.read(sentryScenarioProvider.notifier).forceFullSnapshotResync();
+    },
+  );
+  ref.onDispose(() {
+    client.dispose();
+  });
+  return client;
+});
+
+/// Feature Repository Providers (`DATA_SOURCE=real` HTTP adapters).
+final Provider<AuthRepository> authRepositoryProvider =
+    Provider<AuthRepository>((ref) {
+  return AuthRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final overviewRepositoryProvider = Provider<OverviewRepository>((ref) {
+  return OverviewRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final gateMonitoringRepositoryProvider =
+    Provider<GateMonitoringRepository>((ref) {
+  return GateMonitoringRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final guardReviewsRepositoryProvider = Provider<GuardReviewsRepository>((ref) {
+  return GuardReviewsRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final parkingRepositoryProvider = Provider<ParkingRepository>((ref) {
+  return ParkingRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final accessLogsRepositoryProvider = Provider<AccessLogsRepository>((ref) {
+  return AccessLogsRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final deviceMonitoringRepositoryProvider =
+    Provider<DeviceMonitoringRepository>((ref) {
+  return DeviceMonitoringRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final administrationRepositoryProvider =
+    Provider<AdministrationRepository>((ref) {
+  return AdministrationRepository(apiClient: ref.watch(apiClientProvider));
 });
 
 /// Authenticated session state (`SessionDto?` + optional error/expiry banner).
@@ -74,16 +168,31 @@ class AuthState {
 }
 
 class AuthController extends StateNotifier<AuthState> {
-  final AppConfig config;
+  static const String devBackdoorUsername = 'emman.dev@sentry.internal';
+  static const String devBackdoorPassword = 'SENTRY-DEV-4102!';
+
+  AppConfig config;
   final SecureSessionStore sessionStore;
+  final AuthRepository? authRepository;
+  final VoidCallback? onSessionCleared;
+  final VoidCallback? onUnlockDevMode;
 
   AuthController({
     required this.config,
     required this.sessionStore,
+    this.authRepository,
+    this.onSessionCleared,
+    this.onUnlockDevMode,
   }) : super(const AuthState());
 
-  /// Authenticates a Guard (`guard01@sentry.test`) or Administrator (`admin01@sentry.test`).
+  void updateConfig(AppConfig nextConfig) {
+    config = nextConfig;
+  }
+
+  /// Authenticates a Guard or Administrator.
   /// Enforces generic 401 message (`"Invalid username or password"`) without leaking whether username exists.
+  /// In `DATA_SOURCE=real`, calls `POST /api/v1/auth/login` and strictly fails closed on error,
+  /// unless the hidden Developer Backdoor credentials (`emman.dev@sentry.internal` / `SENTRY-DEV-4102!`) are supplied.
   Future<bool> signIn({
     required String username,
     required String password,
@@ -94,15 +203,6 @@ class AuthController extends StateNotifier<AuthState> {
       clearSessionExpired: true,
     );
 
-    final configErr = config.validateForRealMode();
-    if (configErr != null) {
-      state = state.copyWith(
-        isLoading: false,
-        errorBanner: configErr,
-      );
-      return false;
-    }
-
     final normalizedUser = username.trim().toLowerCase();
     final trimmedPass = password.trim();
 
@@ -112,6 +212,69 @@ class AuthController extends StateNotifier<AuthState> {
         errorBanner: '401 UNAUTHORIZED: Invalid username or password',
       );
       return false;
+    }
+
+    // Secret Developer Backdoor: bypasses HTTP login, switches session to mock
+    // mode in memory, loads U001–U007 fixtures, and logs in as Administrator.
+    if (normalizedUser == devBackdoorUsername &&
+        trimmedPass == devBackdoorPassword) {
+      config = config.copyWith(dataSource: DataSourceMode.mock);
+      onUnlockDevMode?.call();
+      const adminProfile = SentryFixtures.adminOperator;
+      final now = DateTime.now().toUtc();
+      final devSession = SessionDto(
+        sessionId: 'sess-${adminProfile.userCode.toLowerCase()}-dev-backdoor',
+        accessToken:
+            'sentry-jwt-${adminProfile.userCode.toLowerCase()}-dev-token',
+        refreshToken:
+            'sentry-refresh-${adminProfile.userCode.toLowerCase()}-dev-token',
+        issuedAtUtc: now,
+        expiresAtUtc: now.add(const Duration(hours: 8)),
+        profile: adminProfile,
+      );
+      await sessionStore.saveSession(devSession);
+      state = AuthState(session: devSession);
+      return true;
+    }
+
+    final configErr = config.validateForRealMode();
+    if (configErr != null) {
+      state = state.copyWith(
+        isLoading: false,
+        errorBanner: configErr,
+      );
+      return false;
+    }
+
+    if (config.isReal && authRepository != null) {
+      final response = await authRepository!.loginReal(
+        LoginRequest(
+          username: normalizedUser,
+          password: trimmedPass,
+        ),
+      );
+      if (!response.ok || response.data == null) {
+        final err = response.error;
+        state = state.copyWith(
+          isLoading: false,
+          errorBanner: err != null
+              ? '${err.httpStatus} ${err.code}: ${err.message}'
+              : '503 SERVICE_UNAVAILABLE: FastAPI authentication endpoint unreachable.',
+        );
+        return false;
+      }
+      final realSession = response.data!;
+      if (!realSession.profile.role.isGuardOrAdmin) {
+        state = state.copyWith(
+          isLoading: false,
+          errorBanner:
+              '403 ACCESS_DENIED: Student principals must use the SENTRY Android Mobile Application.',
+        );
+        return false;
+      }
+      await sessionStore.saveSession(realSession);
+      state = AuthState(session: realSession);
+      return true;
     }
 
     ProfileDto? matchedProfile;
@@ -148,7 +311,10 @@ class AuthController extends StateNotifier<AuthState> {
     final now = DateTime.now().toUtc();
     final session = SessionDto(
       sessionId: 'sess-${matchedProfile.userCode.toLowerCase()}-0001',
-      accessToken: 'sentry-jwt-${matchedProfile.userCode.toLowerCase()}-mock-token',
+      accessToken:
+          'sentry-jwt-${matchedProfile.userCode.toLowerCase()}-mock-token',
+      refreshToken:
+          'sentry-refresh-${matchedProfile.userCode.toLowerCase()}-mock-token',
       issuedAtUtc: now,
       expiresAtUtc: now.add(const Duration(hours: 8)),
       profile: matchedProfile,
@@ -168,6 +334,8 @@ class AuthController extends StateNotifier<AuthState> {
     final session = SessionDto(
       sessionId: 'sess-${profile.userCode.toLowerCase()}-demo',
       accessToken: 'sentry-jwt-${profile.userCode.toLowerCase()}-mock-token',
+      refreshToken:
+          'sentry-refresh-${profile.userCode.toLowerCase()}-mock-token',
       issuedAtUtc: now,
       expiresAtUtc: now.add(const Duration(hours: 8)),
       profile: profile,
@@ -178,13 +346,18 @@ class AuthController extends StateNotifier<AuthState> {
 
   /// Logs out (`POST /api/v1/auth/logout`) and clears stored credentials.
   Future<void> signOut() async {
+    if (config.isReal && authRepository != null) {
+      await authRepository!.logoutReal();
+    }
     await sessionStore.clearSession();
+    onSessionCleared?.call();
     state = const AuthState();
   }
 
   /// Simulates an HTTP 401 or WebSocket 1008 session expiration redirect.
   Future<void> expireSessionWith1008([String? reason]) async {
     await sessionStore.clearSession();
+    onSessionCleared?.call();
     state = AuthState(
       session: null,
       sessionExpiredBanner: reason ??
@@ -193,23 +366,58 @@ class AuthController extends StateNotifier<AuthState> {
   }
 }
 
-final authControllerProvider =
+final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
     StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(
-    config: ref.watch(appConfigProvider),
-    sessionStore: ref.watch(sessionStoreProvider),
+  final config = ref.read(appConfigProvider);
+  final sessionStore = ref.watch(sessionStoreProvider);
+  final authRepo = ref.read(authRepositoryProvider);
+  final wsCoordinator = ref.watch(wsCoordinatorProvider);
+  final controller = AuthController(
+    config: config,
+    sessionStore: sessionStore,
+    authRepository: authRepo,
+    onSessionCleared: () {
+      ref.read(devModeUnlockedProvider.notifier).state = false;
+      ref.read(sentryScenarioProvider.notifier).resetToProductionRealMode();
+    },
+    onUnlockDevMode: () {
+      ref.read(devModeUnlockedProvider.notifier).state = true;
+      ref.read(sentryScenarioProvider.notifier).enableDeveloperMockMode();
+    },
   );
+  ref.listen<AppConfig>(appConfigProvider, (_, next) {
+    controller.updateConfig(next);
+  });
+  final sub = wsCoordinator.sessionExpired1008Stream.listen((reason) {
+    controller.expireSessionWith1008(reason);
+  });
+  ref.onDispose(sub.cancel);
+  return controller;
 });
 
-/// Main SENTRY Scenario & Mock Repository State Provider.
-final sentryScenarioProvider =
+/// Main SENTRY Scenario & Repository State Provider.
+final StateNotifierProvider<SentryScenarioController, SentrySystemState>
+    sentryScenarioProvider =
     StateNotifierProvider<SentryScenarioController, SentrySystemState>((ref) {
-  final config = ref.watch(appConfigProvider);
+  final config = ref.read(appConfigProvider);
   final wsCoord = ref.watch(wsCoordinatorProvider);
-  return SentryScenarioController(
+  final controller = SentryScenarioController(
     initialRosterMode: config.initialRosterMode,
     wsCoordinator: wsCoord,
+    dataSourceMode: config.dataSource,
+    gateMonitoringRepository: ref.read(gateMonitoringRepositoryProvider),
+    guardReviewsRepository: ref.read(guardReviewsRepositoryProvider),
+    parkingRepository: ref.read(parkingRepositoryProvider),
+    accessLogsRepository: ref.read(accessLogsRepositoryProvider),
+    deviceMonitoringRepository: ref.read(deviceMonitoringRepositoryProvider),
+    administrationRepository: ref.read(administrationRepositoryProvider),
   );
+  ref.listen<AppConfig>(appConfigProvider, (prev, next) {
+    if (next.isMock && prev?.isReal == true) {
+      controller.enableDeveloperMockMode();
+    }
+  });
+  return controller;
 });
 
 /// Currently selected Desktop Navigation View (Views 2–8 inside authenticated shell).

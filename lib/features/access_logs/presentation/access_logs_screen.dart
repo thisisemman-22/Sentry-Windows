@@ -8,6 +8,8 @@ import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/plate_badge.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/fixtures/synthetic_fixtures.dart';
+import '../../../shared/models/attempt_models.dart';
+import '../../../shared/models/visit_models.dart';
 
 /// View 6: `Access Logs` — clean, searchable history of campus visits, gate
 /// attempts, and registered drivers/vehicles.
@@ -22,7 +24,7 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
   int _activeSubTab = 0; // 0: Visits, 1: Attempts, 2: Drivers & vehicles
   String _visitStatusFilter = 'all'; // 'all' | 'active' | 'closed'
   String _searchQuery = '';
-  String _selectedUserCode = 'U007'; // Showcases V007 & V008 independence
+  String? _selectedUserCode;
   String? _selectedVehicleCodeFilter;
 
   @override
@@ -62,6 +64,42 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
           },
         ),
       ],
+    );
+  }
+
+  ChoiceChip _buildFilterChip({
+    Key? key,
+    required BuildContext context,
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unselectedBg =
+        isDark ? const Color(0xFF18181C) : const Color(0xFFF1F5F9);
+    final unselectedBorder =
+        isDark ? const Color(0xFF24242A) : const Color(0xFFE2E8F0);
+    final unselectedText = isDark ? Colors.white : const Color(0xFF0F172A);
+
+    return ChoiceChip(
+      key: key,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : unselectedText,
+        ),
+      ),
+      selected: selected,
+      onSelected: onSelected,
+      backgroundColor: unselectedBg,
+      selectedColor: SentryColors.crimson,
+      checkmarkColor: Colors.white,
+      side: BorderSide(
+        color: selected ? SentryColors.crimson : unselectedBorder,
+      ),
+      shape: const StadiumBorder(),
     );
   }
 
@@ -114,20 +152,23 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
               Wrap(
                 spacing: 8,
                 children: [
-                  ChoiceChip(
-                    label: const Text('All'),
+                  _buildFilterChip(
+                    context: context,
+                    label: 'All',
                     selected: _visitStatusFilter == 'all',
                     onSelected: (_) =>
                         setState(() => _visitStatusFilter = 'all'),
                   ),
-                  ChoiceChip(
-                    label: const Text('Inside campus'),
+                  _buildFilterChip(
+                    context: context,
+                    label: 'Inside campus',
                     selected: _visitStatusFilter == 'active',
                     onSelected: (_) =>
                         setState(() => _visitStatusFilter = 'active'),
                   ),
-                  ChoiceChip(
-                    label: const Text('Exited'),
+                  _buildFilterChip(
+                    context: context,
+                    label: 'Exited',
                     selected: _visitStatusFilter == 'closed',
                     onSelected: (_) =>
                         setState(() => _visitStatusFilter = 'closed'),
@@ -138,10 +179,24 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
           ),
           const SizedBox(height: 18),
           if (filteredVisits.isEmpty)
-            const EmptyState(
+            EmptyState(
               icon: Icons.search_off_rounded,
-              title: 'No matching visits',
-              message: 'Try clearing the filter or search query.',
+              title: sysState.visits.isEmpty
+                  ? 'No campus visits recorded'
+                  : 'No matching visits',
+              message: sysState.visits.isEmpty
+                  ? 'Confirmed gate passages will appear here once vehicles enter the campus.'
+                  : 'Try clearing the filter or search query.',
+              action: OutlinedButton.icon(
+                key: const Key('access_logs_retry_button'),
+                onPressed: () {
+                  ref
+                      .read(sentryScenarioProvider.notifier)
+                      .refreshRealSnapshot();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+              ),
             )
           else
             for (var i = 0; i < filteredVisits.length; i++) ...[
@@ -150,57 +205,72 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
                 final visit = filteredVisits[i];
                 final pf = SentryFixtures.findParticipantByCode(visit.userCode);
                 final vf = SentryFixtures.findVehicleByCode(visit.vehicleCode);
-                return Wrap(
-                  alignment: WrapAlignment.spaceBetween,
+                final timeAndPill = Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
                   crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 16,
-                  runSpacing: 10,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PlateBadge(
-                          plateText: vf?.plateDisplay(sysState.rosterMode),
-                          rfidUid: vf?.rfidUid,
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pf?.displayName(sysState.rosterMode) ??
-                                  visit.userCode,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${visit.userCode} · Vehicle ${visit.vehicleCode} · Bay ${visit.spaceCode ?? 'N/A'}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ],
+                    Text(
+                      visit.isActive
+                          ? 'Entered ${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} · ${ManilaTime.formatDuration(visit.duration())}'
+                          : '${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} – ${ManilaTime.formatTimeOnly(visit.exitedAtUtc)}',
+                      style: SentryTheme.mono(
+                        fontSize: 13,
+                        color: p.slate,
+                      ),
                     ),
-                    Wrap(
-                      spacing: 12,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          visit.isActive
-                              ? 'Entered ${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} · ${ManilaTime.formatDuration(visit.duration())}'
-                              : '${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} – ${ManilaTime.formatTimeOnly(visit.exitedAtUtc)}',
-                          style: SentryTheme.mono(
-                            fontSize: 13,
-                            color: p.slate,
-                          ),
-                        ),
-                        StatusPill(
-                          label: visit.isActive ? 'Inside campus' : 'Exited',
-                          tone: visit.isActive ? PillTone.ok : PillTone.neutral,
-                        ),
-                      ],
+                    StatusPill(
+                      label: visit.isActive ? 'Inside campus' : 'Exited',
+                      tone: visit.isActive ? PillTone.ok : PillTone.neutral,
                     ),
                   ],
+                );
+
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 680;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            PlateBadge(
+                              plateText: vf?.plateDisplay(sysState.rosterMode),
+                              rfidUid: vf?.rfidUid,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    pf?.displayName(sysState.rosterMode) ??
+                                        visit.userCode,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${visit.userCode} · Vehicle ${visit.vehicleCode} · Bay ${visit.spaceCode ?? 'N/A'}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!isNarrow) ...[
+                              const SizedBox(width: 14),
+                              timeAndPill,
+                            ],
+                          ],
+                        ),
+                        if (isNarrow) ...[
+                          const SizedBox(height: 8),
+                          timeAndPill,
+                        ],
+                      ],
+                    );
+                  },
                 );
               }),
             ],
@@ -224,50 +294,82 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
                 'Every entry and exit check, including denied and expired holds.',
           ),
           const SizedBox(height: 18),
-          for (var i = 0; i < sysState.attemptHistory.length; i++) ...[
+          if (sysState.attemptHistory.isEmpty)
+            EmptyState(
+              icon: Icons.history_toggle_off_rounded,
+              title: 'No gate attempts recorded',
+              message:
+                  'Live entry and exit verification attempts will be logged here.',
+              action: OutlinedButton.icon(
+                key: const Key('attempt_history_retry_button'),
+                onPressed: () {
+                  ref
+                      .read(sentryScenarioProvider.notifier)
+                      .refreshRealSnapshot();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+              ),
+            )
+          else
+            for (var i = 0; i < sysState.attemptHistory.length; i++) ...[
             if (i > 0) Divider(color: p.line, height: 22),
             Builder(builder: (context) {
               final att = sysState.attemptHistory[i];
               final outcome = att.latestDecision?.outcome ?? 'pending';
-              return Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 16,
-                runSpacing: 10,
+              final pills = Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  StatusPill.fromDecisionOutcome(outcome),
+                  StatusPill.fromAttemptState(att.state),
+                ],
+              );
+
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 680;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      PlateBadge(
-                        plateText: att.plateText,
-                        rfidUid: att.rfidUid,
-                        isCompact: true,
-                      ),
-                      const SizedBox(width: 14),
-                      Column(
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            att.latestDecision?.reasonMessage ?? att.state,
-                            style: Theme.of(context).textTheme.titleSmall,
+                          PlateBadge(
+                            plateText: att.plateText,
+                            rfidUid: att.rfidUid,
+                            isCompact: true,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${att.userCode ?? 'Unregistered'} · ${att.vehicleCode ?? 'Unknown vehicle'} · ${att.laneId}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  att.latestDecision?.reasonMessage ?? att.state,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${att.userCode ?? 'Unregistered'} · ${att.vehicleCode ?? 'Unknown vehicle'} · ${att.laneId}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
+                          if (!isNarrow) ...[
+                            const SizedBox(width: 14),
+                            pills,
+                          ],
                         ],
                       ),
+                      if (isNarrow) ...[
+                        const SizedBox(height: 8),
+                        pills,
+                      ],
                     ],
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      StatusPill.fromDecisionOutcome(outcome),
-                      StatusPill.fromAttemptState(att.state),
-                    ],
-                  ),
-                ],
+                  );
+                },
               );
             }),
           ],
@@ -279,27 +381,53 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
   Widget _buildParticipantMultiVehicleLookupTab(BuildContext context) {
     final p = SentryPalette.of(context);
     final sysState = ref.watch(sentryScenarioProvider);
-    final selectedUser =
-        SentryFixtures.findParticipantByCode(_selectedUserCode)!;
-    final userVehicles = SentryFixtures.vehiclesForUser(_selectedUserCode);
+    final isMock = ref.watch(appConfigProvider).isMock;
 
-    final matchingVisits = sysState.visits.where((v) {
-      if (v.userCode != _selectedUserCode) return false;
-      if (_selectedVehicleCodeFilter != null &&
-          v.vehicleCode != _selectedVehicleCodeFilter) {
-        return false;
-      }
-      return true;
-    }).toList();
+    if (sysState.participantDirectory.isEmpty) {
+      return const SentryCard(
+        child: EmptyState(
+          icon: Icons.badge_outlined,
+          title: 'No registered drivers loaded',
+          message:
+              'Participant directory records will appear here once synced.',
+        ),
+      );
+    }
 
-    final matchingAttempts = sysState.attemptHistory.where((a) {
-      if (a.userCode != _selectedUserCode) return false;
-      if (_selectedVehicleCodeFilter != null &&
-          a.vehicleCode != _selectedVehicleCodeFilter) {
-        return false;
-      }
-      return true;
-    }).toList();
+    final selectedUser = _selectedUserCode != null
+        ? sysState.participantDirectory
+            .where((u) => u.userCode == _selectedUserCode)
+            .firstOrNull
+        : (isMock
+            ? (sysState.participantDirectory
+                    .where((u) => u.userCode == 'U007')
+                    .firstOrNull ??
+                sysState.participantDirectory.firstOrNull)
+            : null);
+
+    final userVehicles = selectedUser?.vehicles ?? const [];
+
+    final matchingVisits = selectedUser == null
+        ? const <VisitDto>[]
+        : sysState.visits.where((v) {
+            if (v.userCode != selectedUser.userCode) return false;
+            if (_selectedVehicleCodeFilter != null &&
+                v.vehicleCode != _selectedVehicleCodeFilter) {
+              return false;
+            }
+            return true;
+          }).toList();
+
+    final matchingAttempts = selectedUser == null
+        ? const <AttemptDto>[]
+        : sysState.attemptHistory.where((a) {
+            if (a.userCode != selectedUser.userCode) return false;
+            if (_selectedVehicleCodeFilter != null &&
+                a.vehicleCode != _selectedVehicleCodeFilter) {
+              return false;
+            }
+            return true;
+          }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -312,109 +440,122 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
               const SectionHeader(
                 title: 'Select a registered driver',
                 subtitle:
-                    'Multi-vehicle owners (such as U007 with V007 and V008) keep separate history per vehicle.',
+                    'Multi-vehicle owners keep separate history per vehicle.',
               ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: SentryFixtures.participants.map((pf) {
-                  final isSelected = pf.userCode == _selectedUserCode;
-                  return ChoiceChip(
-                    key: Key('lookup_user_${pf.userCode}'),
-                    label: Text(
-                      '${pf.displayName(sysState.rosterMode)} (${pf.userCode})',
-                    ),
+                children: sysState.participantDirectory.map((u) {
+                  final isSelected =
+                      selectedUser != null && u.userCode == selectedUser.userCode;
+                  return _buildFilterChip(
+                    key: Key('lookup_user_${u.userCode}'),
+                    context: context,
+                    label: '${u.fullName} (${u.userCode})',
                     selected: isSelected,
                     onSelected: (_) {
                       setState(() {
-                        _selectedUserCode = pf.userCode;
+                        _selectedUserCode = u.userCode;
                         _selectedVehicleCodeFilter = null;
                       });
                     },
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 22),
-              Text(
-                'Vehicles registered to ${selectedUser.displayName(sysState.rosterMode)}',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ChoiceChip(
-                    key: const Key('filter_vehicle_all'),
-                    label: Text('All vehicles (${userVehicles.length})'),
-                    selected: _selectedVehicleCodeFilter == null,
-                    onSelected: (_) =>
-                        setState(() => _selectedVehicleCodeFilter = null),
-                  ),
-                  ...userVehicles.map((vf) {
-                    final isVehSelected =
-                        _selectedVehicleCodeFilter == vf.vehicleCode;
-                    return SentryCard(
-                      key: Key('vehicle_card_${vf.vehicleCode}'),
-                      selected: isVehSelected,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      radius: 14,
-                      color: isVehSelected ? p.crimsonTint : p.subtle,
-                      onTap: () {
-                        setState(() {
-                          _selectedVehicleCodeFilter = vf.vehicleCode;
-                        });
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            vf.vehicleType == 'motorcycle'
-                                ? Icons.two_wheeler_rounded
-                                : Icons.directions_car_rounded,
-                            size: 18,
-                            color: isVehSelected ? p.crimson : p.slate,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            vf.vehicleCode,
-                            style: SentryTheme.mono(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: p.text,
+              if (selectedUser != null) ...[
+                const SizedBox(height: 22),
+                Text(
+                  'Vehicles registered to ${selectedUser.fullName}',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _buildFilterChip(
+                      key: const Key('filter_vehicle_all'),
+                      context: context,
+                      label: 'All vehicles (${userVehicles.length})',
+                      selected: _selectedVehicleCodeFilter == null,
+                      onSelected: (_) =>
+                          setState(() => _selectedVehicleCodeFilter = null),
+                    ),
+                    ...userVehicles.map((vf) {
+                      final isVehSelected =
+                          _selectedVehicleCodeFilter == vf.vehicleCode;
+                      return SentryCard(
+                        key: Key('vehicle_card_${vf.vehicleCode}'),
+                        selected: isVehSelected,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        radius: 14,
+                        color: isVehSelected ? p.crimsonTint : p.subtle,
+                        onTap: () {
+                          setState(() {
+                            _selectedVehicleCodeFilter = vf.vehicleCode;
+                          });
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              vf.vehicleType == 'motorcycle'
+                                  ? Icons.two_wheeler_rounded
+                                  : Icons.directions_car_rounded,
+                              size: 18,
+                              color: isVehSelected ? p.crimson : p.slate,
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          PlateBadge(
-                            plateText: vf.plateDisplay(sysState.rosterMode),
-                            rfidUid: vf.rfidUid,
-                            isCompact: true,
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
+                            const SizedBox(width: 10),
+                            Text(
+                              vf.vehicleCode,
+                              style: SentryTheme.mono(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: p.text,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            PlateBadge(
+                              plateText: vf.plateNumberDisplay,
+                              rfidUid: vf.rfidUid,
+                              isCompact: true,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 18),
-        SentryCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SectionHeader(
-                title: _selectedVehicleCodeFilter == null
-                    ? 'History for ${selectedUser.displayName(sysState.rosterMode)}'
-                    : 'History for vehicle $_selectedVehicleCodeFilter',
-              ),
+        if (selectedUser == null)
+          const SentryCard(
+            child: EmptyState(
+              icon: Icons.person_search_outlined,
+              title: 'No driver selected',
+              message:
+                  'Select a registered driver above to inspect their vehicles and visit history.',
+            ),
+          )
+        else
+          SentryCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SectionHeader(
+                  title: _selectedVehicleCodeFilter == null
+                      ? 'History for ${selectedUser.fullName}'
+                      : 'History for vehicle $_selectedVehicleCodeFilter',
+                ),
               const SizedBox(height: 14),
               if (matchingVisits.isEmpty && matchingAttempts.isEmpty)
                 const EmptyState(

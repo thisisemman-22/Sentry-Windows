@@ -243,12 +243,33 @@ class SentryTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: p.subtle,
-        selectedColor: p.text,
-        side: BorderSide(color: p.line),
+        backgroundColor:
+            isDark ? const Color(0xFF18181C) : const Color(0xFFF1F5F9),
+        selectedColor: SentryColors.crimson,
+        checkmarkColor: Colors.white,
+        side: WidgetStateBorderSide.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const BorderSide(color: SentryColors.crimson);
+          }
+          return BorderSide(
+            color: isDark ? const Color(0xFF24242A) : const Color(0xFFE2E8F0),
+          );
+        }),
         shape: const StadiumBorder(),
-        labelStyle: s(13, FontWeight.w600, p.text, height: 1.1),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        labelStyle: TextStyle(
+          fontFamily: sansFontFamily,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          height: 1.1,
+          color: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return isDark ? Colors.white : const Color(0xFF0F172A);
+          }),
+        ),
+        secondaryLabelStyle: s(13, FontWeight.w600, Colors.white, height: 1.1),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

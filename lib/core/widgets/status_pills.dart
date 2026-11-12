@@ -46,11 +46,19 @@ class StatusPill extends StatelessWidget {
           tooltip: 'Access decision: allowed',
         );
       case 'review_required':
+      case 'needs_review':
         return const StatusPill(
-          label: 'Needs review',
+          label: 'Review',
           tone: PillTone.warn,
           icon: Icons.visibility_rounded,
           tooltip: 'Access decision: review_required',
+        );
+      case 'idle':
+        return const StatusPill(
+          label: 'Idle',
+          tone: PillTone.neutral,
+          icon: Icons.sensors_rounded,
+          tooltip: 'Gate lane idle',
         );
       case 'denied':
       default:
@@ -89,7 +97,7 @@ class StatusPill extends StatelessWidget {
         );
       case 'guard_review_required':
         return const StatusPill(
-          label: 'Needs review',
+          label: 'Review',
           tone: PillTone.warn,
           icon: Icons.visibility_rounded,
           tooltip: 'guard_review_required',

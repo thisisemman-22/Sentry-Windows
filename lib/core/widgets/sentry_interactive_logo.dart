@@ -158,7 +158,7 @@ class _SentryInteractiveLogoState extends State<SentryInteractiveLogo>
       width: widget.size,
       height: widget.size,
       child: CustomPaint(
-        painter: _SentryLogoPainter(
+        painter: SentryLogoPainter(
           shieldColor: widget.shieldColor,
           carBodyColor: widget.carBodyColor,
           eyeColor: widget.eyeColor,
@@ -170,19 +170,58 @@ class _SentryInteractiveLogoState extends State<SentryInteractiveLogo>
   }
 }
 
-class _SentryLogoPainter extends CustomPainter {
+/// Static SENTRY Brand Logo (clean rendering without continuous tickers).
+class SentryLogo extends StatelessWidget {
+  final double size;
+  final Color shieldColor;
+  final Color carBodyColor;
+  final Color eyeColor;
+
+  const SentryLogo({
+    super.key,
+    this.size = 40.0,
+    this.shieldColor = const Color(0xFFC8102E),
+    this.carBodyColor = const Color(0xFFFFFFFF),
+    this.eyeColor = const Color(0xFF14151A),
+  });
+
+  const SentryLogo.inverted({
+    super.key,
+    this.size = 40.0,
+    this.shieldColor = const Color(0xFFFFFFFF),
+    this.carBodyColor = const Color(0xFFC8102E),
+    this.eyeColor = const Color(0xFF14151A),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: SentryLogoPainter(
+          shieldColor: shieldColor,
+          carBodyColor: carBodyColor,
+          eyeColor: eyeColor,
+        ),
+      ),
+    );
+  }
+}
+
+class SentryLogoPainter extends CustomPainter {
   final Color shieldColor;
   final Color carBodyColor;
   final Color eyeColor;
   final Offset eyeOffset;
   final double lidFactor;
 
-  const _SentryLogoPainter({
-    required this.shieldColor,
-    required this.carBodyColor,
-    required this.eyeColor,
-    required this.eyeOffset,
-    required this.lidFactor,
+  const SentryLogoPainter({
+    this.shieldColor = const Color(0xFFC8102E),
+    this.carBodyColor = const Color(0xFFFFFFFF),
+    this.eyeColor = const Color(0xFF14151A),
+    this.eyeOffset = Offset.zero,
+    this.lidFactor = 1.0,
   });
 
   @override
@@ -267,7 +306,7 @@ class _SentryLogoPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SentryLogoPainter oldDelegate) {
+  bool shouldRepaint(covariant SentryLogoPainter oldDelegate) {
     return oldDelegate.eyeOffset != eyeOffset ||
         oldDelegate.lidFactor != lidFactor ||
         oldDelegate.shieldColor != shieldColor ||

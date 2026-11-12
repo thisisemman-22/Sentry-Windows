@@ -94,6 +94,38 @@ class VisitDto {
     );
   }
 
+  factory VisitDto.fromJson(Map<String, dynamic> json) {
+    return VisitDto(
+      visitId: json['visit_id']?.toString() ?? '',
+      visitCode: json['visit_code']?.toString() ?? 'VS00',
+      entryCorrelationId: json['entry_correlation_id']?.toString() ?? '',
+      exitCorrelationId: json['exit_correlation_id']?.toString(),
+      userId: json['user_id']?.toString() ?? '',
+      userCode: json['user_code']?.toString() ?? '',
+      vehicleId: json['vehicle_id']?.toString() ?? '',
+      vehicleCode: json['vehicle_code']?.toString() ?? '',
+      vehicleType: json['vehicle_type']?.toString() ?? 'car',
+      status: json['status']?.toString() ?? 'active',
+      entryGateId: json['entry_gate_id']?.toString() ?? 'gate-north',
+      entryLaneId: json['entry_lane_id']?.toString() ?? 'lane-car-in',
+      enteredAtUtc: DateTime.tryParse(json['entered_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc(),
+      entryConfirmationSource:
+          json['entry_confirmation_source']?.toString() ?? 'sensor',
+      exitGateId: json['exit_gate_id']?.toString(),
+      exitLaneId: json['exit_lane_id']?.toString(),
+      exitedAtUtc: json['exited_at'] != null
+          ? DateTime.tryParse(json['exited_at'].toString())?.toUtc()
+          : null,
+      exitConfirmationSource: json['exit_confirmation_source']?.toString(),
+      assignmentId: json['assignment_id']?.toString(),
+      lotCode: json['lot_code']?.toString(),
+      spaceId: json['space_id']?.toString(),
+      spaceCode: json['space_code']?.toString(),
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'visit_id': visitId,
         'visit_code': visitCode,

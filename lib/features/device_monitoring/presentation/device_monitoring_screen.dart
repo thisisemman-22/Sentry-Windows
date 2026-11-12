@@ -36,18 +36,38 @@ class DeviceMonitoringScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
 
-        for (var i = 0; i < sysState.devices.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
-          Reveal(
-            index: i + 1,
-            child: _DeviceRowCard(
-              device: sysState.devices[i],
-              palette: p,
-              onInspect: () =>
-                  _showDeviceDetails(context, sysState.devices[i]),
+        if (sysState.devices.isEmpty)
+          SentryCard(
+            child: EmptyState(
+              icon: Icons.router_outlined,
+              title: 'No site devices loaded',
+              message:
+                  'Waiting for camera, RFID reader, and gate controller telemetry from FastAPI.',
+              action: OutlinedButton.icon(
+                key: const Key('devices_retry_button'),
+                onPressed: () {
+                  ref
+                      .read(sentryScenarioProvider.notifier)
+                      .refreshRealSnapshot();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+              ),
             ),
-          ),
-        ],
+          )
+        else
+          for (var i = 0; i < sysState.devices.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            Reveal(
+              index: i + 1,
+              child: _DeviceRowCard(
+                device: sysState.devices[i],
+                palette: p,
+                onInspect: () =>
+                    _showDeviceDetails(context, sysState.devices[i]),
+              ),
+            ),
+          ],
       ],
     );
   }
@@ -140,6 +160,7 @@ class _DeviceRowCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = device.effectiveStatus();
+    final isMock = ref.watch(appConfigProvider).isMock;
     final accent = status == 'offline'
         ? palette.err
         : status == 'degraded'
@@ -151,66 +172,12 @@ class _DeviceRowCard extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
       accent: accent,
       onTap: onInspect,
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 16,
-        runSpacing: 12,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: palette.subtle,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  device.deviceCode,
-                  style: SentryTheme.mono(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: palette.crimson,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        device.displayName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(width: 10),
-                      StatusPill.fromDeviceStatus(status),
-                      if (device.lastErrorCode != null) ...[
-                        const SizedBox(width: 8),
-                        StatusPill(
-                          label: device.lastErrorCode!,
-                          tone: PillTone.err,
-                          monospace: true,
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${device.locationLabel} · Last seen ${ManilaTime.formatTimeOnly(device.lastReceivedAtUtc)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Wrap(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 680;
+          final buttons = Wrap(
             spacing: 6,
+            runSpacing: 6,
             children: [
               OutlinedButton(
                 key: Key('dev_${device.deviceCode}_online_btn'),
@@ -240,8 +207,77 @@ class _DeviceRowCard extends ConsumerWidget {
                 child: const Text('Offline'),
               ),
             ],
-          ),
-        ],
+          );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: palette.subtle,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      device.deviceCode,
+                      style: SentryTheme.mono(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: palette.crimson,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              device.displayName,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            StatusPill.fromDeviceStatus(status),
+                            if (device.lastErrorCode != null)
+                              StatusPill(
+                                label: device.lastErrorCode!,
+                                tone: PillTone.err,
+                                monospace: true,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${device.locationLabel} · Last seen ${ManilaTime.formatTimeOnly(device.lastReceivedAtUtc)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isNarrow && isMock) ...[
+                    const SizedBox(width: 16),
+                    buttons,
+                  ],
+                ],
+              ),
+              if (isNarrow && isMock) ...[
+                const SizedBox(height: 12),
+                buttons,
+              ],
+            ],
+          );
+        },
       ),
     );
   }

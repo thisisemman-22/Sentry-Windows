@@ -6,6 +6,7 @@ import '../../../core/motion/motion.dart';
 import '../../../core/theme/sentry_colors.dart';
 import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/plate_badge.dart';
+import '../../../core/widgets/sentry_interactive_logo.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/fixtures/synthetic_fixtures.dart';
 import '../../../shared/models/attempt_models.dart';
@@ -65,6 +66,15 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
           subtitle:
               'Verify vehicles at each lane and confirm when an allowed vehicle crosses the barrier.',
           actions: [
+            if (config.isReal)
+              OutlinedButton.icon(
+                key: const Key('live_gates_retry_button'),
+                onPressed: () {
+                  ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+              ),
             if (attempt != null)
               OutlinedButton.icon(
                 onPressed: () => _showTechnicalDetails(context, attempt),
@@ -118,20 +128,25 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                               color: isSelected ? p.crimson : p.slate,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           const Spacer(),
-                          StatusPill.fromDecisionOutcome(outcome),
+                          Flexible(
+                            child: StatusPill.fromDecisionOutcome(outcome),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 14),
                       Text(
                         lane.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         laneAttempt?.plateText ??
                             laneAttempt?.rfidUid ??
-                            lane.gateLabel,
+                            'Idle — Waiting for vehicle',
                         style: laneAttempt != null
                             ? SentryTheme.mono(
                                 fontSize: 13,
@@ -146,13 +161,34 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                 );
               }).toList();
 
-              if (constraints.maxWidth < 900) {
+              if (constraints.maxWidth < 620) {
                 return Column(
                   children: [
                     for (final c in cards) ...[
                       c,
                       const SizedBox(height: 10),
                     ],
+                  ],
+                );
+              }
+              if (constraints.maxWidth < 1080) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: cards[0]),
+                        const SizedBox(width: 12),
+                        Expanded(child: cards[1]),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: cards[2]),
+                        const SizedBox(width: 12),
+                        Expanded(child: cards[3]),
+                      ],
+                    ),
                   ],
                 );
               }
@@ -175,12 +211,26 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
           switchKey:
               '$selectedLaneId-${attempt?.correlationId ?? 'empty'}-${attempt?.attemptVersion ?? 0}-${attempt?.state ?? ''}',
           child: attempt == null
-              ? const SentryCard(
-                  child: EmptyState(
-                    icon: Icons.sensors_off_rounded,
-                    title: 'No vehicle at this lane',
-                    message:
-                        'When a camera or RFID reader detects a vehicle, it will appear here automatically.',
+              ? SentryCard(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Column(
+                      children: [
+                        const SentryInteractiveLogo(size: 48),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Gate idle — monitoring for incoming vehicle',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'When a camera or RFID reader detects a vehicle, it will appear here automatically.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : Column(
@@ -194,7 +244,7 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                       onCancelHold: () {
                         ref
                             .read(sentryScenarioProvider.notifier)
-                            .cancelAttemptBeforePassage(attempt.laneId);
+                            .cancelAttemptBeforePassageAsync(attempt.laneId);
                       },
                       onOpenReview: () {
                         ref.read(selectedDesktopTabProvider.notifier).state =
@@ -260,6 +310,7 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
         : 'Witnessed ${attempt.vehicleType} (${attempt.vehicleCode ?? 'vehicle'}) physical departure at Gate exit lane.';
     final notesCtrl = TextEditingController(text: defaultNote);
     String? validationError;
+    bool isSubmitting = false;
 
     showDialog<void>(
       context: context,
@@ -272,8 +323,12 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                     ? 'Confirm vehicle crossed entry gate'
                     : 'Confirm vehicle exited campus',
               ),
-              content: SizedBox(
-                width: 480,
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 560,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+                ),
+                child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,41 +379,57 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                ),
               ),
               actions: [
                 OutlinedButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
                   key: const Key('submit_passage_attestation_button'),
-                  onPressed: () {
-                    final actor = ref.read(authControllerProvider).profile ??
-                        SentryFixtures.guardOperator;
-                    final result = ref
-                        .read(sentryScenarioProvider.notifier)
-                        .confirmVehicleCrossedGate(
-                          laneId: attempt.laneId,
-                          notes: notesCtrl.text,
-                          actor: actor,
-                        );
-                    if (!result.ok) {
-                      setModalState(() {
-                        validationError = result.error?.message;
-                      });
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop();
-                  },
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          setModalState(() {
+                            isSubmitting = true;
+                            validationError = null;
+                          });
+                          final actor =
+                              ref.read(authControllerProvider).profile ??
+                                  SentryFixtures.guardOperator;
+                          final result = await ref
+                              .read(sentryScenarioProvider.notifier)
+                              .confirmVehicleCrossedGateAsync(
+                                laneId: attempt.laneId,
+                                notes: notesCtrl.text,
+                                actor: actor,
+                              );
+                          if (!dialogContext.mounted) return;
+                          if (!result.ok) {
+                            setModalState(() {
+                              isSubmitting = false;
+                              validationError = result.error?.message;
+                            });
+                            return;
+                          }
+                          Navigator.of(dialogContext).pop();
+                        },
                   icon: const Icon(Icons.check_rounded, size: 18),
-                  label: Text(isEntry ? 'Confirm entry' : 'Confirm exit'),
+                  label: Text(
+                    isSubmitting
+                        ? 'Confirming…'
+                        : (isEntry ? 'Confirm entry' : 'Confirm exit'),
+                  ),
                 ),
               ],
             );
           },
         );
       },
-    );
+    ).whenComplete(notesCtrl.dispose);
   }
 
   void _showTechnicalDetails(BuildContext context, AttemptDto attempt) {
@@ -551,7 +622,7 @@ class _DecisionHeroBanner extends StatelessWidget {
                       ),
                       onPressed: onConfirmPassage,
                       icon: const Icon(Icons.check_circle_rounded, size: 19),
-                      label: const Text('Confirm vehicle crossed'),
+                      label: const Text('Confirm Vehicle Crossed Gate'),
                     ),
                   if (needsReview)
                     FilledButton.icon(

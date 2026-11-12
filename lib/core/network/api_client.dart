@@ -1,13 +1,18 @@
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
+import '../../shared/models/auth_models.dart';
 import '../config/app_config.dart';
 import 'api_envelope.dart';
 import 'secure_session_store.dart';
 
 /// Shared HTTP client wrapper for SENTRY Desktop (`campus_parking_desktop`).
 /// Enforces:
-/// - Bearer token injection from [SecureSessionStore]
-/// - Automatic `Idempotency-Key` header on state-changing `POST`/`PATCH` requests
+/// - `baseUrl` from [AppConfig.apiBaseUrl] (`http://127.0.0.1:8000` default)
+/// - `connectTimeout: 3s` and `receiveTimeout: 5s`
+/// - Bearer token injection from [SecureSessionStore] on every authenticated request
+/// - Automatic `Idempotency-Key: <uuid_v4>` header on all mutation requests (`POST`, `PATCH`, `PUT`, `DELETE`)
+/// - Automatic single-attempt token refresh on `401` via `POST /api/v1/auth/refresh`; if refresh fails,
+///   clears [SecureSessionStore] and triggers [onSessionExpired]
 /// - Fail-closed behavior in `DATA_SOURCE=real` mode (never falls back to mock success)
 class ApiClient {
   final AppConfig config;
@@ -15,6 +20,9 @@ class ApiClient {
   final Dio _dio;
   final Uuid _uuid = const Uuid();
   final void Function(String reason)? onSessionExpired;
+  bool _isRefreshing = false;
+
+  Dio get dio => _dio;
 
   ApiClient({
     required this.config,
@@ -25,10 +33,8 @@ class ApiClient {
             Dio(
               BaseOptions(
                 baseUrl: config.apiBaseUrl,
-                connectTimeout:
-                    Duration(milliseconds: config.requestTimeoutMs),
-                receiveTimeout:
-                    Duration(milliseconds: config.requestTimeoutMs),
+                connectTimeout: const Duration(seconds: 3),
+                receiveTimeout: const Duration(seconds: 5),
                 headers: const {
                   'Accept': 'application/json',
                   'Content-Type': 'application/json',
@@ -39,11 +45,16 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final session = await sessionStore.readSession();
-          if (session != null && session.accessToken.isNotEmpty) {
+          if (session != null &&
+              session.accessToken.isNotEmpty &&
+              !options.headers.containsKey('Authorization')) {
             options.headers['Authorization'] = 'Bearer ${session.accessToken}';
           }
           final method = options.method.toUpperCase();
-          if ((method == 'POST' || method == 'PATCH' || method == 'PUT') &&
+          if ((method == 'POST' ||
+                  method == 'PATCH' ||
+                  method == 'PUT' ||
+                  method == 'DELETE') &&
               !options.headers.containsKey('Idempotency-Key')) {
             options.headers['Idempotency-Key'] = _uuid.v4();
           }
@@ -51,15 +62,94 @@ class ApiClient {
         },
         onError: (err, handler) async {
           final status = err.response?.statusCode;
-          if (status == 401) {
-            await sessionStore.clearSession();
-            onSessionExpired?.call(
-              'Session expired or unauthorized (HTTP 401). Please sign in again.',
-            );
+          final path = err.requestOptions.path;
+          final alreadyRetried =
+              err.requestOptions.extra['_retried_after_refresh'] == true;
+          final isAuthEndpoint = path.contains('/api/v1/auth/login') ||
+              path.contains('/api/v1/auth/refresh');
+
+          if (status == 401 && !alreadyRetried && !isAuthEndpoint) {
+            final refreshed = await _attemptSingleTokenRefresh();
+            if (refreshed != null) {
+              try {
+                final retryOptions = err.requestOptions;
+                retryOptions.extra['_retried_after_refresh'] = true;
+                retryOptions.headers['Authorization'] =
+                    'Bearer ${refreshed.accessToken}';
+                final response = await _dio.fetch<dynamic>(retryOptions);
+                return handler.resolve(response);
+              } on DioException catch (retryErr) {
+                await _expireSessionAndNotify();
+                return handler.next(retryErr);
+              }
+            } else {
+              await _expireSessionAndNotify();
+            }
+          } else if (status == 401 && !path.contains('/api/v1/auth/login')) {
+            await _expireSessionAndNotify();
           }
           handler.next(err);
         },
       ),
+    );
+  }
+
+  Future<SessionDto?> _attemptSingleTokenRefresh() async {
+    if (_isRefreshing) return null;
+    final currentSession = await sessionStore.readSession();
+    if (currentSession == null) return null;
+
+    _isRefreshing = true;
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/auth/refresh',
+        data: {
+          'session_id': currentSession.sessionId,
+          'refresh_token':
+              currentSession.refreshToken ?? currentSession.accessToken,
+        },
+        options: Options(
+          extra: const {'_retried_after_refresh': true},
+          headers: {
+            'Authorization': 'Bearer ${currentSession.accessToken}',
+            'Idempotency-Key': _uuid.v4(),
+          },
+        ),
+      );
+      final payload = response.data;
+      if (payload != null &&
+          payload['ok'] == true &&
+          payload['data'] is Map<String, dynamic>) {
+        final data = payload['data'] as Map<String, dynamic>;
+        final SessionDto nextSession;
+        if (data['profile'] is Map<String, dynamic>) {
+          nextSession = SessionDto.fromJson(data);
+        } else {
+          nextSession = currentSession.copyWith(
+            accessToken:
+                data['access_token']?.toString() ?? currentSession.accessToken,
+            refreshToken: data['refresh_token']?.toString() ??
+                currentSession.refreshToken,
+            expiresAtUtc: data['expires_at'] != null
+                ? DateTime.parse(data['expires_at'].toString()).toUtc()
+                : DateTime.now().toUtc().add(const Duration(hours: 8)),
+          );
+        }
+        await sessionStore.saveSession(nextSession);
+        return nextSession;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  Future<void> _expireSessionAndNotify() async {
+    await sessionStore.clearSession();
+    onSessionExpired?.call(
+      'Session expired or unauthorized (HTTP 401). Please sign in again.',
     );
   }
 
@@ -77,8 +167,10 @@ class ApiClient {
       );
     }
     try {
-      final response =
-          await _dio.get<Map<String, dynamic>>(path, queryParameters: queryParameters);
+      final response = await _dio.get<Map<String, dynamic>>(
+        path,
+        queryParameters: queryParameters,
+      );
       return _parseEnvelope(response.data, response.statusCode ?? 200, parser);
     } on DioException catch (e) {
       return _handleDioError(e);
@@ -93,8 +185,9 @@ class ApiClient {
 
   Future<ApiEnvelope<T>> post<T>(
     String path, {
-    Map<String, dynamic>? body,
+    Object? body,
     String? idempotencyKey,
+    Map<String, dynamic>? headers,
     required T Function(dynamic json) parser,
   }) async {
     final configError = config.validateForRealMode();
@@ -106,11 +199,15 @@ class ApiClient {
       );
     }
     try {
+      final mergedHeaders = <String, dynamic>{
+        if (headers != null) ...headers,
+        if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
+      };
       final response = await _dio.post<Map<String, dynamic>>(
         path,
         data: body,
-        options: idempotencyKey != null
-            ? Options(headers: {'Idempotency-Key': idempotencyKey})
+        options: mergedHeaders.isNotEmpty
+            ? Options(headers: mergedHeaders)
             : null,
       );
       return _parseEnvelope(response.data, response.statusCode ?? 200, parser);
@@ -127,8 +224,9 @@ class ApiClient {
 
   Future<ApiEnvelope<T>> patch<T>(
     String path, {
-    Map<String, dynamic>? body,
+    Object? body,
     String? idempotencyKey,
+    Map<String, dynamic>? headers,
     required T Function(dynamic json) parser,
   }) async {
     final configError = config.validateForRealMode();
@@ -140,11 +238,54 @@ class ApiClient {
       );
     }
     try {
+      final mergedHeaders = <String, dynamic>{
+        if (headers != null) ...headers,
+        if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
+      };
       final response = await _dio.patch<Map<String, dynamic>>(
         path,
         data: body,
-        options: idempotencyKey != null
-            ? Options(headers: {'Idempotency-Key': idempotencyKey})
+        options: mergedHeaders.isNotEmpty
+            ? Options(headers: mergedHeaders)
+            : null,
+      );
+      return _parseEnvelope(response.data, response.statusCode ?? 200, parser);
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (e) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.serviceUnavailable,
+        message: 'Unexpected error communicating with FastAPI: $e',
+        httpStatus: 503,
+      );
+    }
+  }
+
+  Future<ApiEnvelope<T>> delete<T>(
+    String path, {
+    Object? body,
+    String? idempotencyKey,
+    Map<String, dynamic>? headers,
+    required T Function(dynamic json) parser,
+  }) async {
+    final configError = config.validateForRealMode();
+    if (configError != null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.configurationInvalid,
+        message: configError,
+        httpStatus: 500,
+      );
+    }
+    try {
+      final mergedHeaders = <String, dynamic>{
+        if (headers != null) ...headers,
+        if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
+      };
+      final response = await _dio.delete<Map<String, dynamic>>(
+        path,
+        data: body,
+        options: mergedHeaders.isNotEmpty
+            ? Options(headers: mergedHeaders)
             : null,
       );
       return _parseEnvelope(response.data, response.statusCode ?? 200, parser);
@@ -212,13 +353,7 @@ class ApiClient {
       );
     }
     return ApiEnvelope.failure(
-      code: status == 401
-          ? ErrorCatalog.unauthorized
-          : status == 403
-              ? ErrorCatalog.accessDenied
-              : status == 409
-                  ? ErrorCatalog.staleVersion
-                  : ErrorCatalog.serviceUnavailable,
+      code: ErrorCatalog.defaultCodeForHttpStatus(status),
       message:
           'FastAPI endpoint unreachable or failed (${e.message ?? 'Network error'}). Fail-closed mode active.',
       httpStatus: status,

@@ -15,9 +15,12 @@ dependencies:
   uuid: ^4.4.0
   shared_preferences: ^2.2.3
   web_socket_channel: ^2.4.5
+  file_selector: ^1.0.3
   # Motion system: staggered reveals + Material shared-axis / fade-through transitions
   flutter_animate: ^4.5.0
   animations: ^2.0.11
+  camera: ^0.12.2
+  camera_windows: ^0.3.0+1
 
 dev_dependencies:
   flutter_test:
@@ -29,6 +32,7 @@ flutter:
   assets:
     - config/local.example.json
     - config/demo.example.json
+    - assets/branding/
 
   # Bundled (offline-safe) typefaces — all SIL Open Font License 1.1 (see assets/fonts/OFL-*.txt)
   # - Schibsted Grotesk: editorial display face for headings & large numbers

@@ -10,6 +10,23 @@ class GuardReviewsRepository {
 
   const GuardReviewsRepository({required this.apiClient});
 
+  Future<ApiEnvelope<List<GuardReviewQueueItem>>> fetchGuardReviewsReal({
+    bool? resolved,
+    int limit = 50,
+  }) {
+    return apiClient.get<List<GuardReviewQueueItem>>(
+      '/api/v1/guard-reviews',
+      queryParameters: {
+        'limit': limit,
+        if (resolved != null) 'resolved': resolved,
+      },
+      parser: (json) => (json as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(GuardReviewQueueItem.fromJson)
+          .toList(),
+    );
+  }
+
   Future<ApiEnvelope<Map<String, dynamic>>> submitGuardReviewReal(
     GuardReviewSubmission submission,
   ) {

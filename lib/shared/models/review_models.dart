@@ -136,6 +136,55 @@ class GuardReviewQueueItem {
           supersedingDecisionId ?? this.supersedingDecisionId,
     );
   }
+
+  factory GuardReviewQueueItem.fromJson(Map<String, dynamic> json) {
+    final evRaw = json['evidence_event_ids'];
+    return GuardReviewQueueItem(
+      reviewCaseId: json['review_case_id']?.toString() ?? '',
+      correlationId: json['correlation_id']?.toString() ?? '',
+      decisionId: json['decision_id']?.toString() ?? '',
+      gateId: json['gate_id']?.toString() ?? 'gate-north',
+      laneId: json['lane_id']?.toString() ?? 'lane-car-in',
+      direction: json['direction']?.toString() ?? 'entry',
+      vehicleType: json['vehicle_type']?.toString() ?? 'car',
+      outcome: json['outcome']?.toString() ?? 'review_required',
+      reasonCode: json['reason_code']?.toString() ?? 'IDENTITY_UNCERTAIN',
+      reasonMessage: json['reason_message']?.toString() ?? '',
+      currentAttemptVersion:
+          (json['current_attempt_version'] as num?)?.toInt() ?? 1,
+      attemptState:
+          json['attempt_state']?.toString() ?? 'guard_review_required',
+      createdAtUtc: DateTime.tryParse(json['created_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc(),
+      attemptExpiresAtUtc:
+          DateTime.tryParse(json['attempt_expires_at']?.toString() ?? '')
+                  ?.toUtc() ??
+              DateTime.now().toUtc().add(const Duration(minutes: 5)),
+      userId: json['user_id']?.toString(),
+      userCode: json['user_code']?.toString(),
+      vehicleId: json['vehicle_id']?.toString(),
+      vehicleCode: json['vehicle_code']?.toString(),
+      plateText: json['plate_text']?.toString(),
+      ocrConfidence: (json['ocr_confidence'] as num?)?.toDouble(),
+      rfidUid: json['rfid_uid']?.toString(),
+      faceRecognitionStatus:
+          json['face_recognition_status']?.toString() ?? 'uncertain',
+      faceSimilarityScore:
+          (json['face_similarity_score'] as num?)?.toDouble(),
+      evidenceEventIds: evRaw is List
+          ? evRaw.map((e) => e.toString()).toList()
+          : const [],
+      isResolved: json['is_resolved'] == true,
+      resolvedAction: json['resolved_action']?.toString(),
+      resolvedByUserCode: json['resolved_by_user_code']?.toString(),
+      resolvedReason: json['resolved_reason']?.toString(),
+      resolvedAtUtc: json['resolved_at'] != null
+          ? DateTime.tryParse(json['resolved_at'].toString())?.toUtc()
+          : null,
+      supersedingDecisionId: json['superseding_decision_id']?.toString(),
+    );
+  }
 }
 
 /// Submission payload for `POST /api/v1/guard-reviews` (`§7.9`).

@@ -87,7 +87,7 @@ class SentryFixtures {
     userId: '10000000-0000-4000-8000-000000000201',
     userCode: 'A001',
     username: 'admin01@sentry.test',
-    fullName: 'Emmanuel Tamboong (ICT Administrator)',
+    fullName: 'Emmanuel Tamboong',
     role: UserRole.administrator,
     assignedStation: 'BSU TNEU Alangilan ICT Command Center',
   );

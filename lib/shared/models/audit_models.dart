@@ -27,6 +27,23 @@ class AuditLogDto {
     required this.summary,
   });
 
+  factory AuditLogDto.fromJson(Map<String, dynamic> json) {
+    return AuditLogDto(
+      auditId: json['audit_id']?.toString() ?? '',
+      occurredAtUtc: DateTime.tryParse(json['occurred_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc(),
+      actorUserId: json['actor_user_id']?.toString() ?? '',
+      actorUserCode: json['actor_user_code']?.toString() ?? '',
+      actorRole: json['actor_role']?.toString() ?? 'administrator',
+      action: json['action']?.toString() ?? 'configuration_review',
+      resourceType: json['resource_type']?.toString() ?? '',
+      resourceId: json['resource_id']?.toString() ?? '',
+      requestId: json['request_id']?.toString() ?? '',
+      summary: json['summary']?.toString() ?? '',
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'audit_id': auditId,
         'occurred_at': ManilaTime.toUtcIso(occurredAtUtc),
@@ -70,4 +87,25 @@ class DashboardDto {
     required this.onlineDevicesCount,
     required this.totalDevicesCount,
   });
+
+  factory DashboardDto.fromJson(Map<String, dynamic> json) {
+    return DashboardDto(
+      activeVisitsCount: (json['active_visits_count'] as num?)?.toInt() ?? 0,
+      entriesTodayCount: (json['entries_today_count'] as num?)?.toInt() ?? 0,
+      exitsTodayCount: (json['exits_today_count'] as num?)?.toInt() ?? 0,
+      activeHoldsAwaitingPassageCount:
+          (json['active_holds_awaiting_passage_count'] as num?)?.toInt() ?? 0,
+      pendingGuardReviewsCount:
+          (json['pending_guard_reviews_count'] as num?)?.toInt() ?? 0,
+      totalCampusSpaces: (json['total_campus_spaces'] as num?)?.toInt() ?? 32,
+      trulyAvailableSpaces:
+          (json['truly_available_spaces'] as num?)?.toInt() ?? 0,
+      occupiedSpaces: (json['occupied_spaces'] as num?)?.toInt() ?? 0,
+      heldSpaces: (json['held_spaces'] as num?)?.toInt() ?? 0,
+      unknownOrStaleSpaces:
+          (json['unknown_or_stale_spaces'] as num?)?.toInt() ?? 0,
+      onlineDevicesCount: (json['online_devices_count'] as num?)?.toInt() ?? 0,
+      totalDevicesCount: (json['total_devices_count'] as num?)?.toInt() ?? 7,
+    );
+  }
 }

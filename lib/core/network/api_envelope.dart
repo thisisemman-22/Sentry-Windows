@@ -7,12 +7,17 @@ class ErrorCatalog {
   static const String invalidCredentials = 'INVALID_CREDENTIALS';
   static const String unauthorized = 'UNAUTHORIZED';
   static const String sessionExpired = 'SESSION_EXPIRED';
+  static const String forbidden = 'FORBIDDEN';
   static const String accessDenied = 'ACCESS_DENIED';
+  static const String validationError = 'VALIDATION_ERROR';
   static const String validationFailed = 'VALIDATION_FAILED';
   static const String notFound = 'NOT_FOUND';
   static const String staleVersion = 'STALE_VERSION';
   static const String attemptExpired = 'ATTEMPT_EXPIRED';
   static const String decisionExpired = 'DECISION_EXPIRED';
+  static const String laneBusy = 'LANE_BUSY';
+  static const String passageStateConflict = 'PASSAGE_STATE_CONFLICT';
+  static const String databaseConflict = 'DATABASE_CONFLICT';
   static const String duplicateActiveVisit = 'DUPLICATE_ACTIVE_VISIT';
   static const String activeVisitNotFound = 'ACTIVE_VISIT_NOT_FOUND';
   static const String unknownCredential = 'UNKNOWN_CREDENTIAL';
@@ -20,9 +25,37 @@ class ErrorCatalog {
   static const String identityMismatch = 'IDENTITY_MISMATCH';
   static const String hardDenialOverrideForbidden =
       'HARD_DENIAL_OVERRIDE_FORBIDDEN';
+  static const String rateLimited = 'RATE_LIMITED';
+  static const String internalError = 'INTERNAL_ERROR';
   static const String configurationInvalid = 'CONFIGURATION_INVALID';
   static const String serviceUnavailable = 'SERVICE_UNAVAILABLE';
   static const String implementedButGated = 'IMPLEMENTED_BUT_GATED';
+
+  /// Default error code mapping for HTTP status codes when the response body
+  /// does not include an explicit `error.code`.
+  static String defaultCodeForHttpStatus(int status) {
+    switch (status) {
+      case 401:
+        return unauthorized;
+      case 403:
+        return forbidden;
+      case 404:
+        return notFound;
+      case 409:
+        return databaseConflict;
+      case 410:
+        return attemptExpired;
+      case 422:
+        return validationError;
+      case 429:
+        return rateLimited;
+      case 500:
+        return internalError;
+      case 503:
+      default:
+        return serviceUnavailable;
+    }
+  }
 
   /// Hard security denial reason codes that MUST NEVER be overridden to `allowed`
   /// via guard review (`approve` action is strictly forbidden on these).
@@ -67,11 +100,38 @@ class ApiError {
     this.details,
   });
 
+  /// Extracts field-level error messages from `details` (e.g. on `409 DATABASE_CONFLICT`
+  /// or `422 VALIDATION_ERROR`). Supports `details: {'field': 'plate_number', 'message': '...'}`
+  /// or `details: {'field_errors': {'plate_number': '...'}}` or `details: {'plate_number': '...'}`.
+  Map<String, String> get fieldErrors {
+    final map = <String, String>{};
+    if (details == null) return map;
+    final field = details!['field']?.toString();
+    if (field != null && field.isNotEmpty) {
+      map[field] = details!['reason']?.toString() ??
+          details!['message']?.toString() ??
+          message;
+    }
+    final nested = details!['field_errors'] ?? details!['fields'];
+    if (nested is Map) {
+      nested.forEach((k, v) {
+        if (k != null && v != null) {
+          map[k.toString()] = v.toString();
+        }
+      });
+    }
+    return map;
+  }
+
+  String? fieldError(String fieldName) => fieldErrors[fieldName];
+
   factory ApiError.fromJson(Map<String, dynamic> json, {int httpStatus = 400}) {
+    final status = (json['http_status'] as num?)?.toInt() ?? httpStatus;
     return ApiError(
-      code: json['code']?.toString() ?? 'UNKNOWN_ERROR',
+      code: json['code']?.toString() ??
+          ErrorCatalog.defaultCodeForHttpStatus(status),
       message: json['message']?.toString() ?? 'An unexpected error occurred.',
-      httpStatus: (json['http_status'] as num?)?.toInt() ?? httpStatus,
+      httpStatus: status,
       details: json['details'] is Map<String, dynamic>
           ? json['details'] as Map<String, dynamic>
           : null,
@@ -84,6 +144,25 @@ class ApiError {
         'http_status': httpStatus,
         if (details != null) 'details': details,
       };
+}
+
+/// Typed failure wrapper for `DATA_SOURCE=real` fail-closed error handling.
+class ApiFailure implements Exception {
+  final ApiError error;
+  final ApiMeta? meta;
+
+  const ApiFailure({
+    required this.error,
+    this.meta,
+  });
+
+  String get code => error.code;
+  String get message => error.message;
+  int get httpStatus => error.httpStatus;
+
+  @override
+  String toString() =>
+      'ApiFailure(httpStatus: ${error.httpStatus}, code: ${error.code}, message: ${error.message})';
 }
 
 class ApiMeta {

@@ -5,9 +5,9 @@ enum DataSourceMode {
   real;
 
   static DataSourceMode fromString(String value) {
-    return value.trim().toLowerCase() == 'real'
-        ? DataSourceMode.real
-        : DataSourceMode.mock;
+    return value.trim().toLowerCase() == 'mock'
+        ? DataSourceMode.mock
+        : DataSourceMode.real;
   }
 }
 
@@ -36,18 +36,21 @@ class AppConfig {
   });
 
   factory AppConfig.fromEnvironment() {
-    const appEnv = String.fromEnvironment('APP_ENV', defaultValue: 'local');
+    const appEnv =
+        String.fromEnvironment('APP_ENV', defaultValue: 'production');
     const dataSourceStr =
-        String.fromEnvironment('DATA_SOURCE', defaultValue: 'mock');
+        String.fromEnvironment('DATA_SOURCE', defaultValue: 'real');
     const rosterModeStr =
         String.fromEnvironment('ROSTER_MODE', defaultValue: 'class_demo');
+    // TODO(API): Replace API_URL_PLACEHOLDER with Patrick's live FastAPI LAN/Tunnel URL
     const apiBaseUrl = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://127.0.0.1:8000',
+      defaultValue: 'https://API_URL_PLACEHOLDER.local:8000',
     );
+    // TODO(API): Replace API_URL_PLACEHOLDER with Patrick's live FastAPI LAN/Tunnel URL
     const wsBaseUrl = String.fromEnvironment(
       'WS_BASE_URL',
-      defaultValue: 'ws://127.0.0.1:8000/api/v1/ws/updates',
+      defaultValue: 'wss://API_URL_PLACEHOLDER.local:8000/api/v1/ws/updates',
     );
     const requestTimeoutMs =
         int.fromEnvironment('REQUEST_TIMEOUT_MS', defaultValue: 5000);

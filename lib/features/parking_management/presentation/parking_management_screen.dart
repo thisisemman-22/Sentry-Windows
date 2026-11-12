@@ -40,10 +40,10 @@ class _ParkingManagementScreenState
     final activeLotCode = _selectedTab == 'MATRIX' ? 'A' : _selectedTab;
     final lotSpaces =
         sysState.spaces.where((s) => s.lotCode == activeLotCode).toList();
-    final selectedSpace = lotSpaces.firstWhere(
-      (s) => s.spaceCode == _selectedSpaceCode,
-      orElse: () => lotSpaces.first,
-    );
+    final selectedSpace = lotSpaces
+            .where((s) => s.spaceCode == _selectedSpaceCode)
+            .firstOrNull ??
+        lotSpaces.firstOrNull;
 
     return ScreenScaffold(
       children: [
@@ -73,19 +73,38 @@ class _ParkingManagementScreenState
           switchKey: _selectedTab,
           child: _selectedTab == 'MATRIX'
               ? _buildBuildingPriorityMatrix(context)
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final blueprint = _buildBlueprintCard(
-                      context,
-                      p,
-                      lotSpaces,
-                      selectedSpace,
-                    );
-                    final inspector = SmoothSwitcher(
-                      switchKey:
-                          '${selectedSpace.spaceCode}-${selectedSpace.physicalStatus}-${selectedSpace.allocationStatus}-${selectedSpace.isStale}',
-                      child: _buildBayInspector(context, p, selectedSpace),
-                    );
+              : selectedSpace == null
+                  ? SentryCard(
+                      child: EmptyState(
+                        icon: Icons.local_parking_rounded,
+                        title: 'Awaiting lot telemetry',
+                        message:
+                            'Waiting for lot space telemetry from backend.',
+                        action: OutlinedButton.icon(
+                          key: const Key('parking_retry_button'),
+                          onPressed: () {
+                            ref
+                                .read(sentryScenarioProvider.notifier)
+                                .refreshRealSnapshot();
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Retry'),
+                        ),
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final blueprint = _buildBlueprintCard(
+                          context,
+                          p,
+                          lotSpaces,
+                          selectedSpace,
+                        );
+                        final inspector = SmoothSwitcher(
+                          switchKey:
+                              '${selectedSpace.spaceCode}-${selectedSpace.physicalStatus}-${selectedSpace.allocationStatus}-${selectedSpace.isStale}',
+                          child: _buildBayInspector(context, p, selectedSpace),
+                        );
 
                     if (constraints.maxWidth < 960) {
                       return Column(
@@ -335,17 +354,19 @@ class _ParkingManagementScreenState
             ),
           ),
 
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            key: const Key('cycle_bay_physical_status_btn'),
-            onPressed: () {
-              ref
-                  .read(sentryScenarioProvider.notifier)
-                  .cycleSpacePhysicalStatus(space.spaceCode);
-            },
-            icon: const Icon(Icons.cameraswitch_outlined, size: 18),
-            label: const Text('Cycle camera state'),
-          ),
+          if (ref.watch(appConfigProvider).isMock) ...[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              key: const Key('cycle_bay_physical_status_btn'),
+              onPressed: () {
+                ref
+                    .read(sentryScenarioProvider.notifier)
+                    .cycleSpacePhysicalStatus(space.spaceCode);
+              },
+              icon: const Icon(Icons.cameraswitch_outlined, size: 18),
+              label: const Text('Cycle camera state'),
+            ),
+          ],
         ],
       ),
     );
@@ -545,11 +566,12 @@ class _BayCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       radius: 16,
       onTap: onTap,
-      child: SizedBox(
-        height: 64,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -582,19 +604,19 @@ class _BayCard extends StatelessWidget {
                   ),
               ],
             ),
-            Row(
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 StatusPill.fromPhysicalSpace(
                   space.physicalStatus,
                   isStale: space.isStale,
                 ),
-                const SizedBox(width: 6),
                 if (space.allocationStatus != 'unassigned')
                   StatusPill.fromAllocationSpace(space.allocationStatus),
-                if (space.hasOccupancyConflict) ...[
-                  const SizedBox(width: 6),
+                if (space.hasOccupancyConflict)
                   const StatusPill(label: 'Conflict', tone: PillTone.err),
-                ],
               ],
             ),
           ],

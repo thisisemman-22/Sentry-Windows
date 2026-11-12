@@ -22,8 +22,13 @@ class OverviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = SentryPalette.of(context);
     final sysState = ref.watch(sentryScenarioProvider);
+    final config = ref.watch(appConfigProvider);
     final kpis = sysState.computeDashboardKpis();
     final lotSummaries = sysState.computeLotSummaries();
+    final hasLiveSnapshot = !config.isReal ||
+        sysState.spaces.isNotEmpty ||
+        sysState.visits.isNotEmpty ||
+        sysState.devices.isNotEmpty;
 
     return ScreenScaffold(
       children: [
@@ -31,6 +36,15 @@ class OverviewScreen extends ConsumerWidget {
           title: 'Campus overview',
           subtitle: 'Live gate flow and bay availability across Lots A to D.',
           actions: [
+            if (config.isReal)
+              OutlinedButton.icon(
+                key: const Key('overview_retry_button'),
+                onPressed: () {
+                  ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+              ),
             OutlinedButton.icon(
               onPressed: () {
                 ref.read(selectedDesktopTabProvider.notifier).state =
@@ -49,6 +63,23 @@ class OverviewScreen extends ConsumerWidget {
             ),
           ],
         ),
+        if (config.isReal && sysState.lastRealApiError != null) ...[
+          const SizedBox(height: 16),
+          Callout(
+            tone: PillTone.warn,
+            icon: Icons.cloud_off_rounded,
+            title: 'FastAPI backend unreachable',
+            message:
+                '${sysState.lastRealApiError!.code}: ${sysState.lastRealApiError!.message}',
+            action: OutlinedButton.icon(
+              onPressed: () {
+                ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+            ),
+          ),
+        ],
         const SizedBox(height: 26),
 
         // 1. 4-Card KPI Row (one big number per card)
@@ -57,13 +88,16 @@ class OverviewScreen extends ConsumerWidget {
             final tiles = [
               MetricTile(
                 revealIndex: 1,
-                label: 'CONFIRMED VEHICLES INSIDE CAMPUS',
+                label: 'Confirmed inside',
                 value: kpis.activeVisitsCount,
-                caption: kpis.activeHoldsAwaitingPassageCount > 0
-                    ? '${kpis.activeHoldsAwaitingPassageCount} waiting to cross at gate'
-                    : 'All gate holds cleared',
+                valueDisplay: hasLiveSnapshot ? null : '—',
+                caption: !hasLiveSnapshot
+                    ? 'Awaiting backend connection'
+                    : kpis.activeHoldsAwaitingPassageCount > 0
+                        ? '${kpis.activeHoldsAwaitingPassageCount} waiting to cross at gate'
+                        : 'All gate holds cleared',
                 icon: Icons.directions_car_filled_outlined,
-                tone: PillTone.ok,
+                tone: hasLiveSnapshot ? PillTone.ok : PillTone.neutral,
                 hint:
                     'Only counts vehicles that have physically crossed the gate. '
                     'Pre-passage 30s holds are tracked separately.',
@@ -76,11 +110,13 @@ class OverviewScreen extends ConsumerWidget {
                 revealIndex: 2,
                 label: 'Entries today',
                 value: kpis.entriesTodayCount,
-                suffix: 'in · ${kpis.exitsTodayCount} out',
-                caption:
-                    '${kpis.activeHoldsAwaitingPassageCount} active gate hold(s)',
+                valueDisplay: hasLiveSnapshot ? null : '—',
+                suffix: hasLiveSnapshot ? 'in · ${kpis.exitsTodayCount} out' : null,
+                caption: !hasLiveSnapshot
+                    ? 'Awaiting backend connection'
+                    : '${kpis.activeHoldsAwaitingPassageCount} active gate hold(s)',
                 icon: Icons.swap_vert_circle_outlined,
-                tone: PillTone.info,
+                tone: hasLiveSnapshot ? PillTone.info : PillTone.neutral,
                 onTap: () {
                   ref.read(selectedDesktopTabProvider.notifier).state =
                       DesktopNavTab.liveGateMonitoring;
@@ -90,13 +126,18 @@ class OverviewScreen extends ConsumerWidget {
                 revealIndex: 3,
                 label: 'Pending guard reviews',
                 value: kpis.pendingGuardReviewsCount,
-                caption: kpis.pendingGuardReviewsCount == 0
-                    ? 'Queue is clear'
-                    : 'Waiting for guard decision',
+                valueDisplay: hasLiveSnapshot ? null : '—',
+                caption: !hasLiveSnapshot
+                    ? 'Awaiting backend connection'
+                    : kpis.pendingGuardReviewsCount == 0
+                        ? 'Queue is clear'
+                        : 'Waiting for guard decision',
                 icon: Icons.fact_check_outlined,
-                tone: kpis.pendingGuardReviewsCount > 0
-                    ? PillTone.warn
-                    : PillTone.ok,
+                tone: !hasLiveSnapshot
+                    ? PillTone.neutral
+                    : (kpis.pendingGuardReviewsCount > 0
+                        ? PillTone.warn
+                        : PillTone.ok),
                 onTap: () {
                   ref.read(selectedDesktopTabProvider.notifier).state =
                       DesktopNavTab.guardReviews;
@@ -106,11 +147,13 @@ class OverviewScreen extends ConsumerWidget {
                 revealIndex: 4,
                 label: 'Free parking bays',
                 value: kpis.trulyAvailableSpaces,
-                suffix: '/ ${kpis.totalCampusSpaces}',
-                caption:
-                    '${kpis.occupiedSpaces} occupied · ${kpis.heldSpaces} held',
+                valueDisplay: hasLiveSnapshot ? null : '—',
+                suffix: hasLiveSnapshot ? '/ ${kpis.totalCampusSpaces}' : null,
+                caption: !hasLiveSnapshot
+                    ? 'Awaiting backend connection'
+                    : '${kpis.occupiedSpaces} occupied · ${kpis.heldSpaces} held',
                 icon: Icons.local_parking_rounded,
-                tone: PillTone.crimson,
+                tone: hasLiveSnapshot ? PillTone.crimson : PillTone.neutral,
                 hint:
                     'Bays with unknown or stale camera readings (${kpis.unknownOrStaleSpaces}) '
                     'are excluded from free count for safety.',
@@ -173,13 +216,24 @@ class OverviewScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    for (var i = 0; i < lotSummaries.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 12),
-                      _LotSummaryRow(
-                        lot: lotSummaries[i],
-                        onTap: () => _showLotDetails(context, ref, lotSummaries[i]),
-                      ),
-                    ],
+                    if (sysState.spaces.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: EmptyState(
+                          icon: Icons.local_parking_rounded,
+                          title: 'Awaiting parking lot telemetry',
+                          message:
+                              'Real bay occupancy and camera telemetry will populate once the backend connects.',
+                        ),
+                      )
+                    else
+                      for (var i = 0; i < lotSummaries.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        _LotSummaryRow(
+                          lot: lotSummaries[i],
+                          onTap: () => _showLotDetails(context, ref, lotSummaries[i]),
+                        ),
+                      ],
                   ],
                 ),
               ),
@@ -358,6 +412,7 @@ class _LotSummaryRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 40,
@@ -384,40 +439,56 @@ class _LotSummaryRow extends StatelessWidget {
                     Text(
                       lot.lotName,
                       style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Near ${lot.nearestLandmark}',
                       style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              if (lot.conflictCount > 0) ...[
-                StatusPill(
-                  label: '${lot.conflictCount} conflict',
-                  tone: PillTone.err,
-                  icon: Icons.report_problem_outlined,
-                ),
-                const SizedBox(width: 8),
-              ] else if (lot.cameraStale) ...[
-                const StatusPill(
-                  label: 'Camera stale',
-                  tone: PillTone.warn,
-                  icon: Icons.videocam_off_outlined,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                '$free / ${lot.totalSpaces} free',
-                style: SentryTheme.mono(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: p.text,
-                ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$free / ${lot.totalSpaces} free',
+                        style: SentryTheme.mono(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: p.text,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 18, color: p.muted),
+                    ],
+                  ),
+                  if (lot.conflictCount > 0) ...[
+                    const SizedBox(height: 4),
+                    StatusPill(
+                      label: '${lot.conflictCount} conflict',
+                      tone: PillTone.err,
+                      icon: Icons.report_problem_outlined,
+                    ),
+                  ] else if (lot.cameraStale) ...[
+                    const SizedBox(height: 4),
+                    const StatusPill(
+                      label: 'Camera stale',
+                      tone: PillTone.warn,
+                      icon: Icons.videocam_off_outlined,
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 6),
-              Icon(Icons.chevron_right_rounded, size: 20, color: p.muted),
             ],
           ),
           const SizedBox(height: 14),
@@ -461,11 +532,21 @@ class _RecentActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          for (final msg in events.take(5))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ActivityRow(message: msg, palette: p),
-            ),
+          if (events.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: EmptyState(
+                icon: Icons.history_toggle_off_rounded,
+                title: 'No recent gate activity',
+                message: 'Live gate passage and review events will appear here.',
+              ),
+            )
+          else
+            for (final msg in events.take(5))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ActivityRow(message: msg, palette: p),
+              ),
         ],
       ),
     );
@@ -538,7 +619,8 @@ class _DevicesCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allHealthy = onlineCount == totalCount;
+    final hasDevices = totalCount > 0;
+    final allHealthy = hasDevices && onlineCount == totalCount;
     return SentryCard(
       onTap: onInspect,
       padding: const EdgeInsets.all(22),
@@ -548,16 +630,20 @@ class _DevicesCompactCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: allHealthy
-                  ? SentryPalette.of(context).okTint
-                  : SentryPalette.of(context).warnTint,
+              color: !hasDevices
+                  ? SentryPalette.of(context).subtle
+                  : (allHealthy
+                      ? SentryPalette.of(context).okTint
+                      : SentryPalette.of(context).warnTint),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               Icons.router_outlined,
-              color: allHealthy
-                  ? SentryPalette.of(context).ok
-                  : SentryPalette.of(context).warn,
+              color: !hasDevices
+                  ? SentryPalette.of(context).muted
+                  : (allHealthy
+                      ? SentryPalette.of(context).ok
+                      : SentryPalette.of(context).warn),
             ),
           ),
           const SizedBox(width: 16),
@@ -566,22 +652,30 @@ class _DevicesCompactCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$onlineCount of $totalCount site devices online',
+                  hasDevices
+                      ? '$onlineCount of $totalCount site devices online'
+                      : 'Awaiting device telemetry',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  allHealthy
-                      ? 'All cameras and RFID readers responding'
-                      : '${totalCount - onlineCount} device needs attention',
+                  !hasDevices
+                      ? 'No devices currently connected to backend'
+                      : (allHealthy
+                          ? 'All cameras and RFID readers responding'
+                          : '${totalCount - onlineCount} device needs attention'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
           StatusPill(
-            label: allHealthy ? 'All online' : 'Check devices',
-            tone: allHealthy ? PillTone.ok : PillTone.warn,
+            label: !hasDevices
+                ? 'Awaiting'
+                : (allHealthy ? 'All online' : 'Check devices'),
+            tone: !hasDevices
+                ? PillTone.neutral
+                : (allHealthy ? PillTone.ok : PillTone.warn),
           ),
         ],
       ),

@@ -75,6 +75,33 @@ class DeviceDto {
     );
   }
 
+  factory DeviceDto.fromJson(Map<String, dynamic> json) {
+    final caps = json['capabilities'];
+    return DeviceDto(
+      deviceCode: json['device_code']?.toString() ?? '',
+      producerId: json['producer_id']?.toString() ?? '',
+      deviceType: json['device_type']?.toString() ?? 'plate_adapter',
+      displayName: json['display_name']?.toString() ?? '',
+      locationLabel: json['location_label']?.toString() ?? '',
+      reportedStatus: json['status']?.toString() ??
+          json['reported_status']?.toString() ??
+          'online',
+      bootId: json['boot_id']?.toString() ?? '',
+      sequenceNumber: (json['sequence_number'] as num?)?.toInt() ?? 0,
+      uptimeSeconds: (json['uptime_seconds'] as num?)?.toInt() ?? 0,
+      softwareVersion: json['software_version']?.toString() ?? '1.0.0',
+      capabilities: caps is List
+          ? caps.map((e) => e.toString()).toList()
+          : const [],
+      lastReceivedAtUtc:
+          DateTime.tryParse(json['last_received_at']?.toString() ?? '')
+                  ?.toUtc() ??
+              DateTime.now().toUtc(),
+      lastErrorCode: json['last_error_code']?.toString(),
+      mappedLotCode: json['mapped_lot_code']?.toString(),
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'device_code': deviceCode,
         'producer_id': producerId,

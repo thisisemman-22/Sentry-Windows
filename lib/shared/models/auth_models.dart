@@ -108,6 +108,7 @@ class ProfileDto {
 class SessionDto {
   final String sessionId;
   final String accessToken;
+  final String? refreshToken;
   final DateTime issuedAtUtc;
   final DateTime expiresAtUtc;
   final ProfileDto profile;
@@ -115,6 +116,7 @@ class SessionDto {
   const SessionDto({
     required this.sessionId,
     required this.accessToken,
+    this.refreshToken,
     required this.issuedAtUtc,
     required this.expiresAtUtc,
     required this.profile,
@@ -125,14 +127,31 @@ class SessionDto {
     return !expiresAtUtc.isAfter(check);
   }
 
+  SessionDto copyWith({
+    String? sessionId,
+    String? accessToken,
+    String? refreshToken,
+    DateTime? issuedAtUtc,
+    DateTime? expiresAtUtc,
+    ProfileDto? profile,
+  }) {
+    return SessionDto(
+      sessionId: sessionId ?? this.sessionId,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
+      issuedAtUtc: issuedAtUtc ?? this.issuedAtUtc,
+      expiresAtUtc: expiresAtUtc ?? this.expiresAtUtc,
+      profile: profile ?? this.profile,
+    );
+  }
+
   factory SessionDto.fromJson(Map<String, dynamic> json) {
     return SessionDto(
       sessionId: json['session_id']?.toString() ?? '',
       accessToken: json['access_token']?.toString() ?? '',
-      issuedAtUtc:
-          DateTime.parse(json['issued_at'].toString()).toUtc(),
-      expiresAtUtc:
-          DateTime.parse(json['expires_at'].toString()).toUtc(),
+      refreshToken: json['refresh_token']?.toString(),
+      issuedAtUtc: DateTime.parse(json['issued_at'].toString()).toUtc(),
+      expiresAtUtc: DateTime.parse(json['expires_at'].toString()).toUtc(),
       profile: ProfileDto.fromJson(
         json['profile'] as Map<String, dynamic>,
       ),
@@ -142,8 +161,11 @@ class SessionDto {
   Map<String, dynamic> toJson() => {
         'session_id': sessionId,
         'access_token': accessToken,
-        'issued_at': '${issuedAtUtc.toIso8601String().replaceAll(RegExp(r'Z$'), '')}Z',
-        'expires_at': '${expiresAtUtc.toIso8601String().replaceAll(RegExp(r'Z$'), '')}Z',
+        if (refreshToken != null) 'refresh_token': refreshToken,
+        'issued_at':
+            '${issuedAtUtc.toIso8601String().replaceAll(RegExp(r'Z$'), '')}Z',
+        'expires_at':
+            '${expiresAtUtc.toIso8601String().replaceAll(RegExp(r'Z$'), '')}Z',
         'profile': profile.toJson(),
       };
 }

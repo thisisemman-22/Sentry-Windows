@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <!-- SENTRY BatStateU Crimson Shield -->
+  <path d="M50 4 L84 15 V47 Q84 73 50 92 Q16 73 16 47 V15 Z" fill="#C8102E" />
+  <!-- Car Cabin -->
+  <path d="M35 41 L41 29 H59 L65 41 Z" fill="#FFFFFF" />
+  <!-- Car Main Body -->
+  <rect x="29" y="41" width="42" height="19" rx="6" ry="6" fill="#FFFFFF" />
+  <!-- Wheels -->
+  <rect x="33" y="60" width="9" height="6" rx="2.5" ry="2.5" fill="#FFFFFF" />
+  <rect x="58" y="60" width="9" height="6" rx="2.5" ry="2.5" fill="#FFFFFF" />
+  <!-- Headlight Eyes -->
+  <rect x="34.75" y="44.5" width="7.5" height="12" rx="3.75" ry="3.75" fill="#14151A" transform="rotate(8 38.5 50.5)" />
+  <rect x="57.75" y="44.5" width="7.5" height="12" rx="3.75" ry="3.75" fill="#14151A" transform="rotate(-8 61.5 50.5)" />
+</svg>

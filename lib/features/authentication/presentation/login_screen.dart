@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/motion/motion.dart';
@@ -16,18 +17,54 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _usernameCtrl =
-      TextEditingController(text: 'guard01@sentry.test');
-  final TextEditingController _passwordCtrl =
-      TextEditingController(text: 'sentry2026');
+  late final TextEditingController _usernameCtrl;
+  late final TextEditingController _passwordCtrl;
   bool _obscurePassword = true;
   int _selectedPersona = 0; // 0 = Guard, 1 = Admin
+  final List<DateTime> _logoTapTimestamps = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final isMock = ref.read(appConfigProvider).isMock;
+    _usernameCtrl = TextEditingController(
+      text: isMock ? 'guard01@sentry.test' : '',
+    );
+    _passwordCtrl = TextEditingController(
+      text: isMock ? 'sentry2026' : '',
+    );
+  }
 
   @override
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  void _unlockDeveloperTestMode() {
+    ref.read(devModeUnlockedProvider.notifier).state = true;
+    ref.read(sentryScenarioProvider.notifier).enableDeveloperMockMode();
+    if (_usernameCtrl.text.trim().isEmpty) {
+      _selectPersona(_selectedPersona);
+    }
+    showSentryToast(
+      context,
+      'Developer Test Mode Enabled',
+      tone: PillTone.ok,
+    );
+  }
+
+  void _handleLogoTap() {
+    final now = DateTime.now();
+    _logoTapTimestamps.removeWhere(
+      (t) => now.difference(t) > const Duration(seconds: 2),
+    );
+    _logoTapTimestamps.add(now);
+    if (_logoTapTimestamps.length >= 5) {
+      _logoTapTimestamps.clear();
+      _unlockDeveloperTestMode();
+    }
   }
 
   void _selectPersona(int index) {
@@ -57,80 +94,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final themeMode = ref.watch(themeModeProvider);
     final config = ref.watch(appConfigProvider);
 
-    return Scaffold(
-      backgroundColor: p.bg,
-      body: Stack(
-        children: [
-          // Subtle top-right theme toggle
-          Positioned(
-            top: 24,
-            right: 28,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (config.isMock)
-                  const StatusPill(
-                    label: 'Demo mode',
-                    tone: PillTone.neutral,
-                    icon: Icons.science_outlined,
-                    tooltip: 'Running with local simulated data',
-                  ),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: themeMode == ThemeMode.dark
-                      ? 'Switch to light mode'
-                      : 'Switch to dark mode',
-                  onPressed: () {
-                    ref.read(themeModeProvider.notifier).state =
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(
+          LogicalKeyboardKey.keyD,
+          control: true,
+          shift: true,
+          alt: true,
+        ): _unlockDeveloperTestMode,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: p.bg,
+          body: Stack(
+            children: [
+              // Subtle top-right theme toggle
+              Positioned(
+                top: 24,
+                right: 28,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (config.isMock)
+                      const StatusPill(
+                        label: 'Developer Test Mode',
+                        tone: PillTone.neutral,
+                        icon: Icons.science_outlined,
+                        tooltip: 'Developer test mode unlocked for this session',
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: themeMode == ThemeMode.dark
+                          ? 'Switch to light mode'
+                          : 'Switch to dark mode',
+                      onPressed: () {
+                        ref.read(themeModeProvider.notifier).state =
+                            themeMode == ThemeMode.dark
+                                ? ThemeMode.light
+                                : ThemeMode.dark;
+                      },
+                      icon: Icon(
                         themeMode == ThemeMode.dark
-                            ? ThemeMode.light
-                            : ThemeMode.dark;
-                  },
-                  icon: Icon(
-                    themeMode == ThemeMode.dark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Centered editorial split stage
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1020),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 780;
-                    final hero = _buildEditorialLeft(context);
-                    final form = _buildFormCard(context, authState, config.isMock);
-                    if (!wide) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          hero,
-                          const SizedBox(height: 28),
-                          form,
-                        ],
-                      );
-                    }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(flex: 11, child: hero),
-                        const SizedBox(width: 56),
-                        Expanded(flex: 10, child: form),
-                      ],
-                    );
-                  },
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+
+              // Centered editorial split stage
+              Center(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1020),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 780;
+                        final hero = _buildEditorialLeft(context);
+                        final form =
+                            _buildFormCard(context, authState, config.isMock);
+                        if (!wide) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              hero,
+                              const SizedBox(height: 28),
+                              form,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(flex: 11, child: hero),
+                            const SizedBox(width: 56),
+                            Expanded(flex: 10, child: form),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -162,7 +214,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          const SentryInteractiveLogo(size: 76),
+          GestureDetector(
+            key: const Key('login_logo_hero'),
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleLogoTap,
+            child: const _LogoHero(),
+          ),
           const SizedBox(height: 24),
           Text.rich(
             TextSpan(
@@ -259,7 +316,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Choose a demo role or enter your operator credentials.',
+              isMock
+                  ? 'Choose a demo role or enter your operator credentials.'
+                  : 'Enter your operator credentials to sign in.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
@@ -348,9 +407,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               key: const Key('login_username_field'),
               controller: _usernameCtrl,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
-                hintText: 'guard01@sentry.test',
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                hintText: isMock
+                    ? 'guard01@sentry.test'
+                    : 'operator@g.batstate-u.edu.ph',
               ),
               onSubmitted: (_) => _submitLogin(),
             ),
@@ -403,6 +464,86 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
+/// Crimson hero tile with the inverted interactive logo and calm sonar rings.
+class _LogoHero extends StatefulWidget {
+  const _LogoHero();
+
+  @override
+  State<_LogoHero> createState() => _LogoHeroState();
+}
+
+class _LogoHeroState extends State<_LogoHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (SentryMotion.reduced(context)) {
+      _ctrl.stop();
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220,
+      height: 220,
+      decoration: BoxDecoration(
+        color: SentryColors.crimson,
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (context, _) => CustomPaint(
+                size: const Size(220, 220),
+                painter: _SonarPainter(_ctrl.value),
+              ),
+            ),
+          ),
+          const SentryInteractiveLogo.inverted(size: 132),
+        ],
+      ),
+    );
+  }
+}
+
+class _SonarPainter extends CustomPainter {
+  final double t;
+  const _SonarPainter(this.t);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    for (var i = 0; i < 3; i++) {
+      final phase = (t + i / 3) % 1.0;
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = Colors.white.withValues(alpha: 0.28 * (1 - phase));
+      canvas.drawCircle(c, 60 + phase * 50, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SonarPainter old) => old.t != t;
+}
+
 class _PersonaButton extends StatelessWidget {
   final String label;
   final bool selected;
@@ -439,12 +580,15 @@ class _PersonaButton extends StatelessWidget {
             children: [
               Icon(icon, size: 17, color: selected ? p.crimsonHover : fg),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
                 ),
               ),
             ],

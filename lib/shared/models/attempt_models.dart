@@ -141,13 +141,39 @@ class AttemptDto {
     return 1; // Stage 1: Observation Received
   }
 
+  /// True when the 30-second parking space hold has elapsed before passage confirmation.
+  bool isHoldExpired([DateTime? nowUtc]) {
+    if (holdExpiresAtUtc == null) return false;
+    final checkTime = (nowUtc ?? DateTime.now()).toUtc();
+    return !checkTime.isBefore(holdExpiresAtUtc!);
+  }
+
+  /// True when the gate attempt lifetime has elapsed or state is `expired`.
+  bool isAttemptExpired([DateTime? nowUtc]) {
+    if (state == 'expired') return true;
+    final checkTime = (nowUtc ?? DateTime.now()).toUtc();
+    return !checkTime.isBefore(expiresAtUtc);
+  }
+
   /// True when the guard can click "Confirm Vehicle Crossed Gate" (`guard_attestation`).
+  /// Enforces that neither the 20s decision nor the 30s space hold nor the 60s attempt
+  /// has expired prior to physical passage confirmation.
   bool canConfirmPassage([DateTime? nowUtc]) {
+    final checkTime = (nowUtc ?? DateTime.now()).toUtc();
     if (passageConfirmed) return false;
-    if (state == 'expired' || state == 'cancelled') return false;
+    if (state == 'expired' || state == 'cancelled' || state == 'completed') {
+      return false;
+    }
+    if (isAttemptExpired(checkTime)) return false;
+    if (direction == 'entry' &&
+        (isHoldExpired(checkTime) ||
+            assignmentStatus == 'released' ||
+            assignmentStatus == 'expired')) {
+      return false;
+    }
     final decision = latestDecision;
     if (decision == null || decision.outcome != 'allowed') return false;
-    return !decision.isExpired(nowUtc);
+    return !decision.isExpired(checkTime);
   }
 
   /// True when the guard can cancel the attempt before passage confirmation.
@@ -230,6 +256,68 @@ class AttemptDto {
       assignmentStatus: assignmentStatus ?? this.assignmentStatus,
       holdExpiresAtUtc: holdExpiresAtUtc ?? this.holdExpiresAtUtc,
       committedVisitId: committedVisitId ?? this.committedVisitId,
+    );
+  }
+
+  factory AttemptDto.fromJson(Map<String, dynamic> json) {
+    return AttemptDto(
+      correlationId: json['correlation_id']?.toString() ?? '',
+      gateId: json['gate_id']?.toString() ?? 'gate-north',
+      laneId: json['lane_id']?.toString() ?? 'lane-car-in',
+      direction: json['direction']?.toString() ?? 'entry',
+      vehicleType: json['vehicle_type']?.toString() ?? 'car',
+      state: json['state']?.toString() ?? 'observation_received',
+      attemptVersion: (json['attempt_version'] as num?)?.toInt() ?? 1,
+      startedAtUtc: DateTime.tryParse(json['started_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc(),
+      expiresAtUtc: DateTime.tryParse(json['expires_at']?.toString() ?? '')
+              ?.toUtc() ??
+          DateTime.now().toUtc().add(const Duration(seconds: 60)),
+      plateText: json['plate_text']?.toString(),
+      plateRecognitionStatus: json['plate_recognition_status']?.toString(),
+      detectionConfidence:
+          (json['detection_confidence'] as num?)?.toDouble(),
+      ocrConfidence: (json['ocr_confidence'] as num?)?.toDouble(),
+      plateModelVersion: json['plate_model_version']?.toString(),
+      rfidUid: json['rfid_uid']?.toString(),
+      rfidReaderModel: json['rfid_reader_model']?.toString(),
+      rfidFirmwareVersion: json['rfid_firmware_version']?.toString(),
+      faceRecognitionStatus:
+          json['face_recognition_status']?.toString() ?? 'pending',
+      faceSimilarityScore:
+          (json['face_similarity_score'] as num?)?.toDouble(),
+      faceCount: (json['face_count'] as num?)?.toInt() ?? 1,
+      faceTriggerEventId: json['face_trigger_event_id']?.toString(),
+      faceModelVersion: json['face_model_version']?.toString(),
+      userId: json['user_id']?.toString(),
+      userCode: json['user_code']?.toString(),
+      vehicleId: json['vehicle_id']?.toString(),
+      vehicleCode: json['vehicle_code']?.toString(),
+      latestDecision: json['latest_decision'] is Map<String, dynamic>
+          ? AccessDecisionData.fromJson(
+              json['latest_decision'] as Map<String, dynamic>,
+            )
+          : null,
+      gateActuationClaimed: json['gate_actuation_claimed'] == true,
+      gateClaimedAtUtc: json['gate_claimed_at'] != null
+          ? DateTime.tryParse(json['gate_claimed_at'].toString())?.toUtc()
+          : null,
+      passageConfirmed: json['passage_confirmed'] == true,
+      passageConfirmationSource:
+          json['passage_confirmation_source']?.toString(),
+      passageConfirmedAtUtc: json['passage_confirmed_at'] != null
+          ? DateTime.tryParse(json['passage_confirmed_at'].toString())?.toUtc()
+          : null,
+      assignmentId: json['assignment_id']?.toString(),
+      spaceId: json['space_id']?.toString(),
+      spaceCode: json['space_code']?.toString(),
+      lotCode: json['lot_code']?.toString(),
+      assignmentStatus: json['assignment_status']?.toString(),
+      holdExpiresAtUtc: json['hold_expires_at'] != null
+          ? DateTime.tryParse(json['hold_expires_at'].toString())?.toUtc()
+          : null,
+      committedVisitId: json['committed_visit_id']?.toString(),
     );
   }
 

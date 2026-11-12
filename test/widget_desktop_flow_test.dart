@@ -1,4 +1,5 @@
 import 'package:campus_parking_desktop/app/app.dart';
+import 'package:campus_parking_desktop/app/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,8 +15,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const ProviderScope(
-        child: SentryDesktopApp(),
+      ProviderScope(
+        overrides: [
+          devModeUnlockedProvider.overrideWith((ref) => true),
+        ],
+        child: const SentryDesktopApp(),
       ),
     );
     await tester.pump();
@@ -23,12 +27,12 @@ void main() {
     // 1. Verify SENTRY Login Screen renders
     expect(find.text('Sign in to Guard & ICT Console'), findsOneWidget);
 
-    // Sign in as Guard (guard01@sentry.test is pre-filled)
+    // Sign in as Guard (guard01@sentry.test is pre-filled in dev test mode)
     await tester.tap(find.byKey(const Key('login_submit_button')));
     await tester.pump();
 
-    // 2. Verify Overview Command Dashboard renders with confirmed post-passage visit label
-    expect(find.text('CONFIRMED VEHICLES INSIDE CAMPUS'), findsOneWidget);
+    // 2. Verify Overview Command Dashboard renders with concise Confirmed inside KPI label
+    expect(find.text('Confirmed inside'), findsOneWidget);
 
     // 3. Navigate to View 3: Live Gate Monitoring
     await tester.tap(find.byKey(const Key('nav_tab_liveGateMonitoring')));
