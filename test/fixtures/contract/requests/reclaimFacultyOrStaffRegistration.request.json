@@ -1,0 +1,12 @@
+{
+  "role": "staff",
+  "identifier": "EXAMPLE-EMP-0002",
+  "identity_kind": "employee",
+  "identity_issuer": "EXAMPLE-UNIVERSITY-HR",
+  "email": "example.staff@example.invalid",
+  "full_name": "Example Staff",
+  "building_id": null,
+  "attestation": {
+    "reference": "EXAMPLE-ATTESTATION-0002"
+  }
+}

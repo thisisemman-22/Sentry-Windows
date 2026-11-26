@@ -1,0 +1,9 @@
+{
+  "role": "student",
+  "identifier": "EXAMPLE-ID-0001",
+  "identity_kind": "student",
+  "identity_issuer": "EXAMPLE-UNIVERSITY",
+  "email": "example.student@example.invalid",
+  "full_name": "Example Student",
+  "building_id": "20000000-0000-4000-8000-000000000001"
+}

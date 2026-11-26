@@ -7,6 +7,8 @@ import '../../../core/theme/sentry_colors.dart';
 import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/sentry_interactive_logo.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
+import 'guard_activation_dialog.dart';
+import 'guard_password_reset_dialog.dart';
 
 /// View 1: Editorial, calm sign-in experience inspired by `design_reference/index.html`.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -82,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submitLogin() async {
     await ref.read(authControllerProvider.notifier).signIn(
-          username: _usernameCtrl.text,
+          identifier: _usernameCtrl.text,
           password: _passwordCtrl.text,
         );
   }
@@ -242,7 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Text(
-              'Real-time gate verification, live bay availability across Lots A to D, and calm decision support for campus security.',
+              'Real-time gate verification, live bay availability across Lots B1 to B5, and calm decision support for campus security.',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: p.slate,
                     height: 1.6,
@@ -265,7 +267,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 icon: Icons.two_wheeler_outlined,
               ),
               StatusPill(
-                label: 'Lots A–D live bays',
+                label: 'Lots B1–B5 live bays',
                 tone: PillTone.neutral,
                 icon: Icons.local_parking_rounded,
               ),
@@ -322,6 +324,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
+
+            if (authState.infoBanner != null) ...[
+              Callout(
+                tone: PillTone.ok,
+                icon: Icons.check_circle_outline_rounded,
+                title: 'Account update',
+                message: authState.infoBanner,
+              ),
+              const SizedBox(height: 16),
+            ],
 
             if (authState.sessionExpiredBanner != null) ...[
               Callout(
@@ -399,7 +411,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
 
             Text(
-              'Email or username',
+              'University ID',
               style: Theme.of(context).textTheme.labelLarge,
             ),
             const SizedBox(height: 8),
@@ -456,6 +468,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   authState.isLoading ? 'Signing in…' : 'Sign in',
                 ),
               ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton(
+                  key: const Key('guard_activation_link'),
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => showGuardActivationDialog(context),
+                  child: const Text(
+                    'First-time activation (Security Guards only)',
+                  ),
+                ),
+                TextButton(
+                  key: const Key('guard_password_reset_link'),
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => showGuardPasswordResetDialog(context),
+                  child: const Text(
+                    'Forgot password? (Security Guards only)',
+                  ),
+                ),
+              ],
             ),
           ],
         ),

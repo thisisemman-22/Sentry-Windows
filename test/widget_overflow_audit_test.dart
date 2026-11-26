@@ -106,16 +106,40 @@ void main() {
         await tapKey(tester, 'nav_tab_$tab');
       }
 
-      // Administration sub-tabs: registration, facial enrollment, audit log.
-      for (var i = 0; i < 4; i++) {
+      // Parking lot tabs B1–B5 + Building routing + Bay Inspector Drawer
+      await tapKey(tester, 'nav_tab_parkingManagement');
+      for (final lot in const ['B1', 'B2', 'B3', 'B4', 'B5', 'MATRIX']) {
+        await tapKey(tester, 'parking_tab_$lot');
+      }
+      await tapKey(tester, 'parking_tab_B1');
+      await tapKey(tester, 'bay_card_B1-L1');
+      expect(find.textContaining('Inspector'), findsWidgets);
+      await tester.tapAt(const Offset(4, 4));
+      await settle(tester);
+
+      // Overview Export Report dialog (CSV / PDF)
+      await tapKey(tester, 'nav_tab_overview');
+      await tapKey(tester, 'overview_export_report_button');
+      await tapKey(tester, 'export_menu_csv');
+      expect(find.byKey(const Key('export_confirm_button')), findsOneWidget);
+      await tapKey(tester, 'export_cancel_button');
+
+      // Administration sub-tabs: Account registration, Activation help,
+      // Facial enrollment (Planned), Drivers & vehicles (Planned), Audit log (Planned).
+      await tapKey(tester, 'nav_tab_administration');
+      for (var i = 0; i < 5; i++) {
         await tapKey(tester, 'admin_subtab_$i');
       }
 
-      // Access Logs sub-tabs.
+      // Access Logs sub-tabs + Export Report dialog.
       await tapKey(tester, 'nav_tab_accessLogs');
       for (var i = 0; i < 3; i++) {
         await tapKey(tester, 'access_logs_subtab_$i');
       }
+      await tapKey(tester, 'access_logs_export_report_button');
+      await tapKey(tester, 'export_menu_pdf');
+      expect(find.byKey(const Key('export_confirm_button')), findsOneWidget);
+      await tapKey(tester, 'export_cancel_button');
 
       // Confirm-passage modal on Live Gate.
       await tapKey(tester, 'nav_tab_liveGateMonitoring');

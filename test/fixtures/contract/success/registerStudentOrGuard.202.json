@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "data": {
+    "registration_id": "40000000-0000-4000-8000-000000000001",
+    "registration_state": "pending_email",
+    "account_active": false,
+    "activation_required": true,
+    "expires_at": "2026-11-28T02:00:00Z",
+    "activation_code_delivery": "provider_accepted"
+  },
+  "error": null,
+  "meta": {
+    "request_id": "90000000-0000-4000-8000-000000000004",
+    "timestamp": "2026-11-21T02:00:00Z",
+    "contract_version": "1.0.0",
+    "idempotent_replay": false
+  }
+}

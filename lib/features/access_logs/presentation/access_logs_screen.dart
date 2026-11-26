@@ -10,6 +10,7 @@ import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/fixtures/synthetic_fixtures.dart';
 import '../../../shared/models/attempt_models.dart';
 import '../../../shared/models/visit_models.dart';
+import 'report_export_dialog.dart';
 
 /// View 6: `Access Logs` — clean, searchable history of campus visits, gate
 /// attempts, and registered drivers/vehicles.
@@ -36,6 +37,10 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
           subtitle:
               'Search confirmed campus stays, gate attempts, and registered vehicles.',
           actions: [
+            const ExportReportMenuButton(
+              buttonKey: Key('access_logs_export_report_button'),
+              defaultScope: ReportExportScope.campusVisits,
+            ),
             SegmentTabs(
               keyPrefix: 'access_logs_subtab',
               labels: const [

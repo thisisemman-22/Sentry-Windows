@@ -1,0 +1,9 @@
+{
+  "role": "guard",
+  "identifier": "EXAMPLE-GUARD-0001",
+  "identity_kind": "external_guard",
+  "identity_issuer": "EXAMPLE-SECURITY-AGENCY",
+  "email": "example.guard@example.invalid",
+  "full_name": "Example Guard",
+  "building_id": null
+}

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Top-down architectural vector Car and Motorcycle graphics ported from
 /// James Villaflor's `app.js` (`topCarSvg()` and `topMotoSvg()`) for the
-/// Overhead Parking Blueprint (`Lots A–D`).
+/// Overhead Parking Blueprint (`Lots B1–B5`).
 class VehicleTopDownSvg extends StatelessWidget {
   final String vehicleType; // 'car' | 'motorcycle'
   final Color primaryColor;

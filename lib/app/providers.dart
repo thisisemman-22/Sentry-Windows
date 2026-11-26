@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_envelope.dart';
+import '../core/network/phase4_contract.dart';
 import '../core/network/secure_session_store.dart';
 import '../core/network/ws_client.dart';
 import '../features/access_logs/data/access_logs_repository.dart';
+import '../features/administration/data/admin_registration_api.dart';
 import '../features/administration/data/administration_repository.dart';
+import '../features/administration/state/register_form_controller.dart';
 import '../features/authentication/data/auth_repository.dart';
 import '../features/device_monitoring/data/device_monitoring_repository.dart';
 import '../features/guard_reviews/data/guard_reviews_repository.dart';
@@ -63,6 +67,9 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     sessionStore: sessionStore,
     onSessionExpired: (reason) {
       wsCoordinator.handleCloseCode1008(reason);
+    },
+    onSessionRefreshed: (nextSession) {
+      ref.read(authControllerProvider.notifier).applyRefreshedSession(nextSession);
     },
   );
 });
@@ -122,23 +129,44 @@ final deviceMonitoringRepositoryProvider =
   return DeviceMonitoringRepository(apiClient: ref.watch(apiClientProvider));
 });
 
+/// Lazy Administrator-only Phase 4 registration API & form controller.
+/// NEVER watched or instantiated in Guard sessions.
+final Provider<AdminRegistrationApi> adminRegistrationApiProvider =
+    Provider<AdminRegistrationApi>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.isMock) {
+    return MockAdminRegistrationApi();
+  }
+  return HttpAdminRegistrationApi(apiClient: ref.watch(apiClientProvider));
+});
+
+final StateNotifierProvider<RegisterFormController, RegisterFormState>
+    registerFormControllerProvider =
+    StateNotifierProvider<RegisterFormController, RegisterFormState>((ref) {
+  return RegisterFormController(
+    readApi: () => ref.read(adminRegistrationApiProvider),
+  );
+});
+
 final administrationRepositoryProvider =
     Provider<AdministrationRepository>((ref) {
   return AdministrationRepository(apiClient: ref.watch(apiClientProvider));
 });
 
-/// Authenticated session state (`SessionDto?` + optional error/expiry banner).
+/// Authenticated session state (`SessionDto?` + optional banners).
 class AuthState {
   final SessionDto? session;
   final bool isLoading;
   final String? errorBanner;
   final String? sessionExpiredBanner;
+  final String? infoBanner;
 
   const AuthState({
     this.session,
     this.isLoading = false,
     this.errorBanner,
     this.sessionExpiredBanner,
+    this.infoBanner,
   });
 
   bool get isAuthenticated => session != null && !session!.isExpired();
@@ -155,6 +183,8 @@ class AuthState {
     bool clearError = false,
     String? sessionExpiredBanner,
     bool clearSessionExpired = false,
+    String? infoBanner,
+    bool clearInfo = false,
   }) {
     return AuthState(
       session: clearSession ? null : (session ?? this.session),
@@ -163,6 +193,7 @@ class AuthState {
       sessionExpiredBanner: clearSessionExpired
           ? null
           : (sessionExpiredBanner ?? this.sessionExpiredBanner),
+      infoBanner: clearInfo ? null : (infoBanner ?? this.infoBanner),
     );
   }
 }
@@ -176,6 +207,10 @@ class AuthController extends StateNotifier<AuthState> {
   final AuthRepository? authRepository;
   final VoidCallback? onSessionCleared;
   final VoidCallback? onUnlockDevMode;
+  final VoidCallback? onDifferentAccountSignedIn;
+  final String? initialUserId;
+
+  String? _lastAuthenticatedUserId;
 
   AuthController({
     required this.config,
@@ -183,41 +218,71 @@ class AuthController extends StateNotifier<AuthState> {
     this.authRepository,
     this.onSessionCleared,
     this.onUnlockDevMode,
-  }) : super(const AuthState());
+    this.onDifferentAccountSignedIn,
+    this.initialUserId,
+  })  : _lastAuthenticatedUserId = initialUserId,
+        super(const AuthState());
 
   void updateConfig(AppConfig nextConfig) {
     config = nextConfig;
   }
 
-  /// Authenticates a Guard or Administrator.
-  /// Enforces generic 401 message (`"Invalid username or password"`) without leaking whether username exists.
-  /// In `DATA_SOURCE=real`, calls `POST /api/v1/auth/login` and strictly fails closed on error,
-  /// unless the hidden Developer Backdoor credentials (`emman.dev@sentry.internal` / `SENTRY-DEV-4102!`) are supplied.
+  /// Updates session tokens silently after a single-flight refresh WITHOUT
+  /// resetting open Admin forms or pending `Idempotency-Key`.
+  void applyRefreshedSession(SessionDto nextSession) {
+    state = state.copyWith(
+      session: nextSession,
+      clearError: true,
+    );
+  }
+
+  void setLoginInfoBanner(String message) {
+    state = state.copyWith(
+      infoBanner: message,
+      clearError: true,
+      clearSessionExpired: true,
+    );
+  }
+
+  void _recordSignedInAccount(String userId) {
+    if (_lastAuthenticatedUserId != null && _lastAuthenticatedUserId != userId) {
+      onDifferentAccountSignedIn?.call();
+    }
+    _lastAuthenticatedUserId = userId;
+  }
+
+  /// Authenticates a Guard or Administrator (`POST /api/v1/auth/login` -> `GET /api/v1/me`).
+  /// - NEVER trims or normalizes `password`.
+  /// - Returns neutral `"Sign-in failed"` on `401 AUTHENTICATION_FAILED`.
+  /// - Rejects mobile-only roles (`student`, `faculty`, `staff`) with `"Please use the SENTRY Mobile Application"`, calls logout, and clears tokens.
   Future<bool> signIn({
-    required String username,
+    String? identifier,
+    String? username,
     required String password,
   }) async {
     state = state.copyWith(
       isLoading: true,
       clearError: true,
       clearSessionExpired: true,
+      clearInfo: true,
     );
 
-    final normalizedUser = username.trim().toLowerCase();
-    final trimmedPass = password.trim();
+    final rawIdentifier = identifier ?? username ?? '';
+    final cleanIdentifier = rawIdentifier.trim();
+    final normalizedLower = cleanIdentifier.toLowerCase();
 
-    if (normalizedUser.isEmpty || trimmedPass.isEmpty) {
+    if (cleanIdentifier.isEmpty || password.isEmpty) {
       state = state.copyWith(
         isLoading: false,
-        errorBanner: '401 UNAUTHORIZED: Invalid username or password',
+        errorBanner: 'Sign-in failed',
       );
       return false;
     }
 
     // Secret Developer Backdoor: bypasses HTTP login, switches session to mock
     // mode in memory, loads U001–U007 fixtures, and logs in as Administrator.
-    if (normalizedUser == devBackdoorUsername &&
-        trimmedPass == devBackdoorPassword) {
+    if (normalizedLower == devBackdoorUsername &&
+        password == devBackdoorPassword) {
       config = config.copyWith(dataSource: DataSourceMode.mock);
       onUnlockDevMode?.call();
       const adminProfile = SentryFixtures.adminOperator;
@@ -230,8 +295,10 @@ class AuthController extends StateNotifier<AuthState> {
             'sentry-refresh-${adminProfile.userCode.toLowerCase()}-dev-token',
         issuedAtUtc: now,
         expiresAtUtc: now.add(const Duration(hours: 8)),
+        refreshExpiresAtUtc: now.add(const Duration(hours: 12)),
         profile: adminProfile,
       );
+      _recordSignedInAccount(adminProfile.userId);
       await sessionStore.saveSession(devSession);
       state = AuthState(session: devSession);
       return true;
@@ -247,63 +314,108 @@ class AuthController extends StateNotifier<AuthState> {
     }
 
     if (config.isReal && authRepository != null) {
-      final response = await authRepository!.loginReal(
+      final loginRes = await authRepository!.login(
         LoginRequest(
-          username: normalizedUser,
-          password: trimmedPass,
+          identifier: cleanIdentifier,
+          password: password,
         ),
       );
-      if (!response.ok || response.data == null) {
-        final err = response.error;
+      if (!loginRes.ok || loginRes.data == null) {
+        final err = loginRes.error;
+        final String msg;
+        if (err == null) {
+          msg =
+              '503 SERVICE_UNAVAILABLE (Request ID: ${loginRes.meta.requestId}): Authentication endpoint unreachable.';
+        } else if (err.code == ErrorCatalog.authenticationFailed ||
+            err.httpStatus == 401) {
+          msg = 'Sign-in failed';
+        } else {
+          final failure = Phase4ApiFailure.fromError(
+            err,
+            requestId: loginRes.meta.requestId,
+          );
+          msg = '${failure.userDisplayMessage} [Request ID: ${loginRes.meta.requestId}]';
+        }
+        state = state.copyWith(
+          isLoading: false,
+          errorBanner: msg,
+        );
+        return false;
+      }
+
+      final pair = loginRes.data!;
+      // Save provisional token pair so getOwnProfile sends Bearer authorization.
+      final provisionalSession = SessionDto(
+        sessionId: 'sess-provisional',
+        accessToken: pair.accessToken,
+        refreshToken: pair.refreshToken,
+        tokenType: pair.tokenType,
+        issuedAtUtc: DateTime.now().toUtc(),
+        expiresAtUtc: pair.accessExpiresAtUtc,
+        refreshExpiresAtUtc: pair.refreshExpiresAtUtc,
+        profile: SentryFixtures.guardOperator,
+      );
+      await sessionStore.saveSession(provisionalSession);
+
+      final profileRes = await authRepository!.getOwnProfile();
+      if (!profileRes.ok || profileRes.data == null) {
+        await sessionStore.clearSession();
+        final err = profileRes.error;
         state = state.copyWith(
           isLoading: false,
           errorBanner: err != null
-              ? '${err.httpStatus} ${err.code}: ${err.message}'
-              : '503 SERVICE_UNAVAILABLE: FastAPI authentication endpoint unreachable.',
+              ? 'Unable to load account profile (${err.code}). [Request ID: ${profileRes.meta.requestId}]'
+              : '503 SERVICE_UNAVAILABLE: Unable to verify operator role. [Request ID: ${profileRes.meta.requestId}]',
         );
         return false;
       }
-      final realSession = response.data!;
-      if (!realSession.profile.role.isGuardOrAdmin) {
+
+      final profileData = profileRes.data!;
+      if (!profileData.role.isGuardOrAdmin) {
+        try {
+          await authRepository!.logoutCurrentSession();
+        } catch (_) {}
+        await sessionStore.clearSession();
         state = state.copyWith(
           isLoading: false,
-          errorBanner:
-              '403 ACCESS_DENIED: Student principals must use the SENTRY Android Mobile Application.',
+          errorBanner: 'Please use the SENTRY Mobile Application',
         );
         return false;
       }
+
+      final realSession = SessionDto.fromTokenPairAndProfile(pair, profileData);
+      _recordSignedInAccount(profileData.id);
       await sessionStore.saveSession(realSession);
       state = AuthState(session: realSession);
       return true;
     }
 
+    // Mock / Developer Test Mode authentication
     ProfileDto? matchedProfile;
-    if ((normalizedUser == 'guard01@sentry.test' ||
-            normalizedUser == 'guard01' ||
-            normalizedUser == 'g001') &&
-        trimmedPass.length >= 4) {
+    if ((normalizedLower == 'guard01@sentry.test' ||
+            normalizedLower == 'guard01' ||
+            normalizedLower == 'g001') &&
+        password.length >= 4) {
       matchedProfile = SentryFixtures.guardOperator;
-    } else if ((normalizedUser == 'admin01@sentry.test' ||
-            normalizedUser == 'admin01' ||
-            normalizedUser == 'a001') &&
-        trimmedPass.length >= 4) {
+    } else if ((normalizedLower == 'admin01@sentry.test' ||
+            normalizedLower == 'admin01' ||
+            normalizedLower == 'a001') &&
+        password.length >= 4) {
       matchedProfile = SentryFixtures.adminOperator;
     }
 
     if (matchedProfile == null) {
       state = state.copyWith(
         isLoading: false,
-        errorBanner: '401 UNAUTHORIZED: Invalid username or password',
+        errorBanner: 'Sign-in failed',
       );
       return false;
     }
 
-    // Desktop app is strictly for Guard and Administrator principals
     if (!matchedProfile.role.isGuardOrAdmin) {
       state = state.copyWith(
         isLoading: false,
-        errorBanner:
-            '403 ACCESS_DENIED: Student principals must use the SENTRY Android Mobile Application.',
+        errorBanner: 'Please use the SENTRY Mobile Application',
       );
       return false;
     }
@@ -316,10 +428,16 @@ class AuthController extends StateNotifier<AuthState> {
       refreshToken:
           'sentry-refresh-${matchedProfile.userCode.toLowerCase()}-mock-token',
       issuedAtUtc: now,
-      expiresAtUtc: now.add(const Duration(hours: 8)),
+      expiresAtUtc: now.add(
+        matchedProfile.role.isAdmin
+            ? const Duration(minutes: 5)
+            : const Duration(minutes: 10),
+      ),
+      refreshExpiresAtUtc: now.add(const Duration(hours: 8)),
       profile: matchedProfile,
     );
 
+    _recordSignedInAccount(matchedProfile.userId);
     await sessionStore.saveSession(session);
     state = AuthState(session: session);
     return true;
@@ -338,23 +456,96 @@ class AuthController extends StateNotifier<AuthState> {
           'sentry-refresh-${profile.userCode.toLowerCase()}-mock-token',
       issuedAtUtc: now,
       expiresAtUtc: now.add(const Duration(hours: 8)),
+      refreshExpiresAtUtc: now.add(const Duration(hours: 12)),
       profile: profile,
     );
+    _recordSignedInAccount(profile.userId);
     await sessionStore.saveSession(session);
     state = AuthState(session: session);
   }
 
-  /// Logs out (`POST /api/v1/auth/logout`) and clears stored credentials.
+  /// Calls `POST /api/v1/auth/logout` with `{}` and ALWAYS clears local tokens
+  /// on every outcome (including `503` or network failure).
   Future<void> signOut() async {
-    if (config.isReal && authRepository != null) {
-      await authRepository!.logoutReal();
+    try {
+      if (config.isReal && authRepository != null) {
+        await authRepository!.logoutCurrentSession();
+      }
+    } catch (_) {
+      // Discard local tokens regardless of backend outcome.
+    } finally {
+      await sessionStore.clearSession();
+      onSessionCleared?.call();
+      state = const AuthState();
     }
-    await sessionStore.clearSession();
-    onSessionCleared?.call();
-    state = const AuthState();
   }
 
-  /// Simulates an HTTP 401 or WebSocket 1008 session expiration redirect.
+  /// Changes the authenticated caller's password (`POST /api/v1/auth/password/change`).
+  /// Never trims passwords. On `200`, revokes every session and redirects to `LoginScreen`.
+  Future<ApiEnvelope<bool>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final policyErr = validatePasswordPolicy(newPassword);
+    if (policyErr != null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.passwordPolicyRejected,
+        message: policyErr,
+        httpStatus: 400,
+      );
+    }
+
+    if (config.isReal && authRepository != null) {
+      final res = await authRepository!.changePassword(
+        PasswordChangeRequest(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        ),
+      );
+      if (res.ok) {
+        await sessionStore.clearSession();
+        onSessionCleared?.call();
+        state = const AuthState(
+          infoBanner:
+              'Password changed. Every active session was signed out; please sign in again.',
+        );
+      } else if (res.error?.code == ErrorCatalog.passwordChangeConflict) {
+        await sessionStore.clearSession();
+        onSessionCleared?.call();
+        state = AuthState(
+          errorBanner:
+              'Credentials changed concurrently. Please sign in again. [Request ID: ${res.meta.requestId}]',
+        );
+      }
+      return res;
+    }
+
+    // Mock / Developer Test Mode behavior
+    if (currentPassword.isEmpty) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.currentPasswordInvalid,
+        message: 'Current password is incorrect.',
+        httpStatus: 400,
+      );
+    }
+    if (currentPassword == newPassword) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.passwordPolicyRejected,
+        message: 'New password cannot reuse the current password.',
+        httpStatus: 400,
+      );
+    }
+
+    await sessionStore.clearSession();
+    onSessionCleared?.call();
+    state = const AuthState(
+      infoBanner:
+          'Password changed (Developer Test Mode). All sessions signed out; please sign in again.',
+    );
+    return ApiEnvelope.success(true, requestId: 'mock-pwd-change-200');
+  }
+
+  /// Handles HTTP 401 refresh failure or WebSocket 1008 session expiration.
   Future<void> expireSessionWith1008([String? reason]) async {
     await sessionStore.clearSession();
     onSessionCleared?.call();
@@ -378,11 +569,18 @@ final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
     authRepository: authRepo,
     onSessionCleared: () {
       ref.read(devModeUnlockedProvider.notifier).state = false;
+      ref.read(selectedDesktopTabProvider.notifier).state =
+          DesktopNavTab.overview;
       ref.read(sentryScenarioProvider.notifier).resetToProductionRealMode();
     },
     onUnlockDevMode: () {
       ref.read(devModeUnlockedProvider.notifier).state = true;
       ref.read(sentryScenarioProvider.notifier).enableDeveloperMockMode();
+    },
+    onDifferentAccountSignedIn: () {
+      if (ref.exists(registerFormControllerProvider)) {
+        ref.read(registerFormControllerProvider.notifier).resetAll();
+      }
     },
   );
   ref.listen<AppConfig>(appConfigProvider, (_, next) {
@@ -429,7 +627,7 @@ enum DesktopNavTab {
       Icons.videocam_outlined, Icons.videocam_rounded),
   guardReviews('Reviews', 'Cases the system wasn\'t sure about.',
       Icons.fact_check_outlined, Icons.fact_check_rounded),
-  parkingManagement('Parking', 'Every bay across Lots A to D.',
+  parkingManagement('Parking', 'Every bay across Lots B1 to B5.',
       Icons.local_parking_outlined, Icons.local_parking_rounded),
   accessLogs('Access Logs', 'Search entries, exits and registered vehicles.',
       Icons.receipt_long_outlined, Icons.receipt_long_rounded),
@@ -448,6 +646,9 @@ enum DesktopNavTab {
 final selectedDesktopTabProvider = StateProvider<DesktopNavTab>((ref) {
   return DesktopNavTab.overview;
 });
+
+/// Currently selected campus lot tab in View 5 (`'B1'..'B5'` or `'MATRIX'`).
+final selectedParkingLotProvider = StateProvider<String>((ref) => 'B1');
 
 /// Lane currently focused on the Live Gates page
 /// (`lane-car-in` | `lane-moto-in` | `lane-car-out` | `lane-moto-out`).

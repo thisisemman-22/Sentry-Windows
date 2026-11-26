@@ -607,27 +607,33 @@ class _ReviewCaseCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              PlateBadge(
-                plateText: item.plateText,
-                rfidUid: item.rfidUid,
-                isCompact: true,
-              ),
-              const Spacer(),
-              StatusPill(
-                label: item.isResolved
-                    ? 'Resolved (${item.resolvedAction})'
-                    : item.isHardSecurityDenial
-                        ? 'Hard denial'
-                        : 'Needs review',
-                tone: item.isResolved
-                    ? PillTone.ok
-                    : item.isHardSecurityDenial
-                        ? PillTone.err
-                        : PillTone.warn,
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                PlateBadge(
+                  plateText: item.plateText,
+                  rfidUid: item.rfidUid,
+                  isCompact: true,
+                ),
+                StatusPill(
+                  label: item.isResolved
+                      ? 'Resolved (${item.resolvedAction})'
+                      : item.isHardSecurityDenial
+                          ? 'Hard denial'
+                          : 'Needs review',
+                  tone: item.isResolved
+                      ? PillTone.ok
+                      : item.isHardSecurityDenial
+                          ? PillTone.err
+                          : PillTone.warn,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Text(

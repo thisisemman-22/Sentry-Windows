@@ -68,8 +68,8 @@ class VehicleFixture {
 }
 
 /// Official SENTRY 7-Participant / 8-Vehicle Fixtures (`U001`–`U007`, `V001`–`V008`),
-/// Staff Operator Accounts (`G001`, `A001`), 7-Building Priority Matrix, Lots A–D Spaces,
-/// and Registered Producers (`D01`–`D07`).
+/// Staff Operator Accounts (`G001`, `A001`), 7-Building Priority Matrix,
+/// Surveyed Campus Parking Lots `B1–B5`, and Registered Producers (`D01`–`D07`).
 class SentryFixtures {
   SentryFixtures._();
 
@@ -313,458 +313,417 @@ class SentryFixtures {
     }).toList();
   }
 
-  // Official 7-Building × 4-Lot Priority Matrix
+  // Official 7-Building × 5-Lot Priority Matrix (B1–B5, B5 = Overflow)
   static const List<BuildingPriorityRow> buildingPriorityRows = [
-    BuildingPriorityRow(
-      buildingCode: 'CET',
-      buildingName: 'College of Engineering & Technology (CET)',
-      orderedLots: ['A', 'B', 'C', 'D'],
-    ),
-    BuildingPriorityRow(
-      buildingCode: 'REGISTRAR',
-      buildingName: 'University Registrar & Administration',
-      orderedLots: ['A', 'B', 'C', 'D'],
-    ),
-    BuildingPriorityRow(
-      buildingCode: 'STEERHUB',
-      buildingName: 'STEER Hub (Science, Technology, Engineering & Research)',
-      orderedLots: ['B', 'A', 'C', 'D'],
-    ),
-    BuildingPriorityRow(
-      buildingCode: 'FITNESS CENTER',
-      buildingName: 'Campus Fitness & Wellness Center',
-      orderedLots: ['B', 'C', 'D', 'A'],
-    ),
     BuildingPriorityRow(
       buildingCode: 'CEAFA',
       buildingName: 'College of Engineering, Architecture & Fine Arts (CEAFA)',
-      orderedLots: ['C', 'D', 'B', 'A'],
+      orderedLots: ['B1', 'B3', 'B2', 'B4', 'B5'],
     ),
     BuildingPriorityRow(
       buildingCode: 'CICS',
       buildingName: 'College of Informatics & Computing Sciences (CICS)',
-      orderedLots: ['C', 'D', 'B', 'A'],
+      orderedLots: ['B3', 'B1', 'B2', 'B4', 'B5'],
+    ),
+    BuildingPriorityRow(
+      buildingCode: 'STEERHUB',
+      buildingName: 'STEER Hub (Science, Technology, Engineering & Research)',
+      orderedLots: ['B2', 'B1', 'B3', 'B4', 'B5'],
+    ),
+    BuildingPriorityRow(
+      buildingCode: 'FITNESS CENTER',
+      buildingName: 'Campus Fitness & Gymnasium Center',
+      orderedLots: ['B2', 'B3', 'B1', 'B4', 'B5'],
+    ),
+    BuildingPriorityRow(
+      buildingCode: 'CET',
+      buildingName: 'College of Engineering & Technology (CET)',
+      orderedLots: ['B4', 'B1', 'B2', 'B3', 'B5'],
+    ),
+    BuildingPriorityRow(
+      buildingCode: 'REGISTRAR',
+      buildingName: 'University Registrar & Administration',
+      orderedLots: ['B1', 'B3', 'B2', 'B4', 'B5'],
     ),
     BuildingPriorityRow(
       buildingCode: 'RGR',
       buildingName: 'RGR Academic & Laboratory Building',
-      orderedLots: ['D', 'C', 'B', 'A'],
+      orderedLots: ['B3', 'B2', 'B1', 'B4', 'B5'],
     ),
   ];
 
-  // Initial Spaces across Lots A, B, C, D (32 bays total: 8 per lot)
+  // Initial Surveyed Campus Spaces across Lots B1–B5 (92 mapped slots total)
+  // - Lot B1: 29 mapped (27 confirmed formal + 2 unconfirmed far-end L11/R11)
+  // - Lot B2: 32 mapped (10 moto strip + 18 car + 4 informal aisle A1–A4)
+  // - Lot B3: 23 mapped (20 formal incl. PWD R10 & center C1 + 3 informal aisle A1–A3)
+  // - Lot B4: CET (schematic pending; empty until backend supplies spaces)
+  // - Lot B5: 8 overflow bays (B5-OF01..B5-OF08)
   static List<SpaceDto> buildInitialSpaces([DateTime? nowUtc]) {
     final now = (nowUtc ?? DateTime.now()).toUtc();
-    return [
-      // LOT A — STEER Hub & CET Forecourt
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000101',
-        spaceCode: 'A-C01',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        buildingDistanceMeters: const {'CET': 35, 'STEERHUB': 42, 'CEAFA': 160},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000102',
-        spaceCode: 'A-C02',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'occupied',
-        allocationStatus: 'assigned',
-        confidence: 0.99,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        assignmentId: '50000000-0000-4000-8000-000000000003',
-        visitId: '60000000-0000-4000-8000-000000000003',
-        assignedVehicleCode: 'V003',
-        assignedUserCode: 'U003',
-        buildingDistanceMeters: const {'CET': 38, 'STEERHUB': 40, 'CEAFA': 165},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000103',
-        spaceCode: 'A-C03',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'held',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        assignmentId: '50000000-0000-4000-8000-000000000001',
-        visitId: null, // Strictly null while held before passage!
-        assignedVehicleCode: 'V001',
-        assignedUserCode: 'U001',
-        holdExpiresAtUtc: now.add(const Duration(seconds: 26)),
-        buildingDistanceMeters: const {'CET': 42, 'STEERHUB': 45, 'CEAFA': 170},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000104',
-        spaceCode: 'A-C04',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.96,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        buildingDistanceMeters: const {'CET': 46, 'STEERHUB': 48, 'CEAFA': 175},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000105',
-        spaceCode: 'A-C05',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'occupied',
-        allocationStatus: 'unassigned', // Occupancy Conflict Alert!
-        confidence: 0.94,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        buildingDistanceMeters: const {'CET': 50, 'STEERHUB': 52, 'CEAFA': 180},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000106',
-        spaceCode: 'A-C06',
-        lotCode: 'A',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        buildingDistanceMeters: const {'CET': 54, 'STEERHUB': 55, 'CEAFA': 185},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000107',
-        spaceCode: 'A-M01',
-        lotCode: 'A',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        buildingDistanceMeters: const {'CET': 30, 'STEERHUB': 34, 'CEAFA': 155},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000108',
-        spaceCode: 'A-M02',
-        lotCode: 'A',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'occupied',
-        allocationStatus: 'assigned',
-        confidence: 0.96,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 4)),
-        producerId: 'occupancy-lot-a-01',
-        assignmentId: '50000000-0000-4000-8000-000000000002',
-        visitId: '60000000-0000-4000-8000-000000000002',
-        assignedVehicleCode: 'V002',
-        assignedUserCode: 'U002',
-        buildingDistanceMeters: const {'CET': 32, 'STEERHUB': 36, 'CEAFA': 158},
-      ),
+    final spaces = <SpaceDto>[];
 
-      // LOT B — CEAFA Building & STEER Hub North
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000201',
-        spaceCode: 'B-C01',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.99,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 28, 'STEERHUB': 35, 'CICS': 60},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000202',
-        spaceCode: 'B-C02',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 30, 'STEERHUB': 38, 'CICS': 62},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000203',
-        spaceCode: 'B-C03',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 34, 'STEERHUB': 42, 'CICS': 65},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000204',
-        spaceCode: 'B-C04',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'occupied',
-        allocationStatus: 'assigned',
-        confidence: 0.99,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        assignmentId: '50000000-0000-4000-8000-000000000007',
-        visitId: '60000000-0000-4000-8000-000000000007',
-        assignedVehicleCode: 'V007',
-        assignedUserCode: 'U007',
-        buildingDistanceMeters: const {'CEAFA': 24, 'STEERHUB': 44, 'CICS': 58},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000205',
-        spaceCode: 'B-C05',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.96,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 38, 'STEERHUB': 48, 'CICS': 68},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000206',
-        spaceCode: 'B-C06',
-        lotCode: 'B',
-        compatibility: 'car_only',
-        physicalStatus: 'unknown', // Camera occluded / unknown -> NEVER available!
-        allocationStatus: 'unassigned',
-        confidence: null,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 15)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 42, 'STEERHUB': 50, 'CICS': 70},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000207',
-        spaceCode: 'B-M01',
-        lotCode: 'B',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 22, 'STEERHUB': 32, 'CICS': 55},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000208',
-        spaceCode: 'B-M02',
-        lotCode: 'B',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 5)),
-        producerId: 'occupancy-lot-b-01',
-        buildingDistanceMeters: const {'CEAFA': 25, 'STEERHUB': 34, 'CICS': 57},
-      ),
+    SpaceDto makeSpace({
+      required int uuidNum,
+      required String spaceCode,
+      required String lotCode,
+      required String slotLabel,
+      SpaceSlotCategory category = SpaceSlotCategory.formal,
+      bool isAccessiblePwd = false,
+      bool isPartlyOutOfView = false,
+      bool isFarEnd = false,
+      String compatibility = 'car_only',
+      String physicalStatus = 'available',
+      String allocationStatus = 'unassigned',
+      double? confidence = 0.97,
+      int staleSeconds = 4,
+      String? producerId,
+      String? assignmentId,
+      String? visitId,
+      String? assignedVehicleCode,
+      String? assignedUserCode,
+      DateTime? holdExpiresAtUtc,
+      Map<String, int> distances = const {},
+    }) {
+      return SpaceDto(
+        spaceId:
+            '30000000-0000-4000-8000-${uuidNum.toString().padLeft(12, '0')}',
+        spaceCode: spaceCode,
+        lotCode: lotCode,
+        slotLabel: slotLabel,
+        slotCategory: category,
+        isAccessiblePwd: isAccessiblePwd,
+        isPartlyOutOfView: isPartlyOutOfView,
+        isFarEnd: isFarEnd,
+        compatibility: compatibility,
+        physicalStatus: physicalStatus,
+        allocationStatus: allocationStatus,
+        confidence: confidence,
+        lastObservedAtUtc: now.subtract(Duration(seconds: staleSeconds)),
+        producerId: producerId ?? 'occupancy-lot-${lotCode.toLowerCase()}-01',
+        assignmentId: assignmentId,
+        visitId: visitId,
+        assignedVehicleCode: assignedVehicleCode,
+        assignedUserCode: assignedUserCode,
+        holdExpiresAtUtc: holdExpiresAtUtc,
+        buildingDistanceMeters: distances,
+      );
+    }
 
-      // LOT C — Gov. Feliciano Leviste Gymnasium & CICS
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000301',
-        spaceCode: 'C-C01',
-        lotCode: 'C',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 25, 'CEAFA': 40, 'FITNESS CENTER': 30},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000302',
-        spaceCode: 'C-C02',
-        lotCode: 'C',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 28, 'CEAFA': 42, 'FITNESS CENTER': 34},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000303',
-        spaceCode: 'C-C03',
-        lotCode: 'C',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.96,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 32, 'CEAFA': 46, 'FITNESS CENTER': 38},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000304',
-        spaceCode: 'C-C04',
-        lotCode: 'C',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.95,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 36, 'CEAFA': 50, 'FITNESS CENTER': 42},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000305',
-        spaceCode: 'C-M01',
-        lotCode: 'C',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 20, 'CEAFA': 35, 'FITNESS CENTER': 22},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000306',
-        spaceCode: 'C-M02',
-        lotCode: 'C',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 22, 'CEAFA': 37, 'FITNESS CENTER': 24},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000307',
-        spaceCode: 'C-M03',
-        lotCode: 'C',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.99,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 24, 'CEAFA': 39, 'FITNESS CENTER': 26},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000308',
-        spaceCode: 'C-M04',
-        lotCode: 'C',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 6)),
-        producerId: 'occupancy-lot-c-01',
-        buildingDistanceMeters: const {'CICS': 26, 'CEAFA': 41, 'FITNESS CENTER': 28},
-      ),
+    // -------------------------------------------------------------------------
+    // LOT B1 — Albert Einstein / CEAFA Left (27 Confirmed + 2 Unconfirmed = 29)
+    // -------------------------------------------------------------------------
+    const b1Dist = {'CEAFA': 24, 'CICS': 45, 'REGISTRAR': 65, 'STEERHUB': 90};
+    for (var i = 1; i <= 11; i++) {
+      final isUnconfirmed = i == 11;
+      String phys = 'available';
+      String alloc = 'unassigned';
+      double? conf = 0.98;
+      String? assignId;
+      String? visitId;
+      String? veh;
+      String? usr;
+      DateTime? holdExp;
 
-      // LOT D — RGR Academic & Laboratory Annex
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000401',
-        spaceCode: 'D-C01',
-        lotCode: 'D',
-        compatibility: 'car_only',
+      if (i == 2) {
+        phys = 'occupied';
+        alloc = 'assigned';
+        assignId = '50000000-0000-4000-8000-000000000003';
+        visitId = '60000000-0000-4000-8000-000000000003';
+        veh = 'V003';
+        usr = 'U003';
+      } else if (i == 3) {
+        phys = 'available';
+        alloc = 'held';
+        assignId = '50000000-0000-4000-8000-000000000001';
+        visitId = null;
+        veh = 'V001';
+        usr = 'U001';
+        holdExp = now.add(const Duration(seconds: 26));
+      } else if (i == 5) {
+        // Intentional Occupancy Conflict demo bay
+        phys = 'occupied';
+        alloc = 'unassigned';
+      } else if (i == 7 || i == 9) {
+        phys = 'occupied';
+        alloc = 'assigned';
+        assignId = '50000000-0000-4000-8000-00000000010$i';
+        visitId = '60000000-0000-4000-8000-00000000010$i';
+      } else if (isUnconfirmed) {
+        phys = 'unknown';
+        conf = null;
+      }
+
+      spaces.add(
+        makeSpace(
+          uuidNum: 100 + i,
+          spaceCode: 'B1-L$i',
+          lotCode: 'B1',
+          slotLabel: 'L$i',
+          category: isUnconfirmed
+              ? SpaceSlotCategory.unconfirmedFarEnd
+              : SpaceSlotCategory.formal,
+          isFarEnd: isUnconfirmed,
+          physicalStatus: phys,
+          allocationStatus: alloc,
+          confidence: conf,
+          producerId: 'occupancy-lot-b1-01',
+          assignmentId: assignId,
+          visitId: visitId,
+          assignedVehicleCode: veh,
+          assignedUserCode: usr,
+          holdExpiresAtUtc: holdExp,
+          distances: b1Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 11; i++) {
+      final isFarEnd = i >= 9;
+      final isUnconfirmed = i == 11;
+      String phys = 'available';
+      String alloc = 'unassigned';
+      double? conf = 0.97;
+      String? assignId;
+      String? visitId;
+      String? veh;
+      String? usr;
+
+      if (i == 4) {
+        phys = 'occupied';
+        alloc = 'assigned';
+        assignId = '50000000-0000-4000-8000-000000000007';
+        visitId = '60000000-0000-4000-8000-000000000007';
+        veh = 'V007';
+        usr = 'U007';
+      } else if (i == 6) {
+        phys = 'unknown';
+        conf = null;
+      } else if (i == 2 || i == 8) {
+        phys = 'occupied';
+        alloc = 'assigned';
+        assignId = '50000000-0000-4000-8000-00000000020$i';
+        visitId = '60000000-0000-4000-8000-00000000020$i';
+      } else if (isUnconfirmed) {
+        phys = 'unknown';
+        conf = null;
+      }
+
+      spaces.add(
+        makeSpace(
+          uuidNum: 120 + i,
+          spaceCode: 'B1-R$i',
+          lotCode: 'B1',
+          slotLabel: 'R$i',
+          category: isUnconfirmed
+              ? SpaceSlotCategory.unconfirmedFarEnd
+              : SpaceSlotCategory.formal,
+          isFarEnd: isFarEnd,
+          physicalStatus: phys,
+          allocationStatus: alloc,
+          confidence: conf,
+          producerId: 'occupancy-lot-b1-01',
+          assignmentId: assignId,
+          visitId: visitId,
+          assignedVehicleCode: veh,
+          assignedUserCode: usr,
+          distances: b1Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 7; i++) {
+      final occupied = i == 2 || i == 5;
+      spaces.add(
+        makeSpace(
+          uuidNum: 140 + i,
+          spaceCode: 'B1-M$i',
+          lotCode: 'B1',
+          slotLabel: 'M$i',
+          physicalStatus: occupied ? 'occupied' : 'available',
+          allocationStatus: occupied ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b1-01',
+          assignmentId: occupied ? '50000000-0000-4000-8000-00000000030$i' : null,
+          visitId: occupied ? '60000000-0000-4000-8000-00000000030$i' : null,
+          distances: b1Dist,
+        ),
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // LOT B2 — Gymnasium & STEER Hub (32 Mapped: 10 Moto + 18 Car + 4 Aisle)
+    // -------------------------------------------------------------------------
+    const b2Dist = {'STEERHUB': 22, 'FITNESS CENTER': 18, 'CEAFA': 85, 'CET': 95};
+    for (var i = 1; i <= 10; i++) {
+      final label = i == 10 ? 'MB10' : '$i';
+      final isV002 = i == 2;
+      final isOcc = isV002 || i == 5 || i == 7;
+      spaces.add(
+        makeSpace(
+          uuidNum: 200 + i,
+          spaceCode: 'B2-MB$i',
+          lotCode: 'B2',
+          slotLabel: label,
+          compatibility: 'motorcycle_only',
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b2-01',
+          assignmentId: isV002
+              ? '50000000-0000-4000-8000-000000000002'
+              : (isOcc ? '50000000-0000-4000-8000-00000000040$i' : null),
+          visitId: isV002
+              ? '60000000-0000-4000-8000-000000000002'
+              : (isOcc ? '60000000-0000-4000-8000-00000000040$i' : null),
+          assignedVehicleCode: isV002 ? 'V002' : null,
+          assignedUserCode: isV002 ? 'U002' : null,
+          distances: b2Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 8; i++) {
+      final isOcc = i == 3 || i == 6;
+      spaces.add(
+        makeSpace(
+          uuidNum: 220 + i,
+          spaceCode: 'B2-L$i',
+          lotCode: 'B2',
+          slotLabel: 'L$i',
+          isPartlyOutOfView: i == 8,
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b2-01',
+          distances: b2Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 10; i++) {
+      final isOcc = i == 2 || i == 4 || i == 9;
+      spaces.add(
+        makeSpace(
+          uuidNum: 240 + i,
+          spaceCode: 'B2-R$i',
+          lotCode: 'B2',
+          slotLabel: 'R$i',
+          isPartlyOutOfView: i == 10,
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b2-01',
+          distances: b2Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 4; i++) {
+      spaces.add(
+        makeSpace(
+          uuidNum: 260 + i,
+          spaceCode: 'B2-A$i',
+          lotCode: 'B2',
+          slotLabel: 'A$i',
+          category: SpaceSlotCategory.informalAisle,
+          physicalStatus: (i == 1 || i == 4) ? 'occupied' : 'available',
+          allocationStatus: 'unassigned',
+          producerId: 'occupancy-lot-b2-01',
+          distances: b2Dist,
+        ),
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // LOT B3 — Albert Einstein / CEAFA Right (20 Formal + 3 Informal = 23)
+    // -------------------------------------------------------------------------
+    const b3Dist = {'CEAFA': 26, 'CICS': 32, 'RGR': 55, 'REGISTRAR': 68};
+    for (var i = 1; i <= 9; i++) {
+      final isOcc = i == 2 || i == 5;
+      spaces.add(
+        makeSpace(
+          uuidNum: 300 + i,
+          spaceCode: 'B3-L$i',
+          lotCode: 'B3',
+          slotLabel: 'L$i',
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b3-01',
+          distances: b3Dist,
+        ),
+      );
+    }
+
+    for (var i = 1; i <= 10; i++) {
+      final isOcc = i == 3 || i == 7;
+      spaces.add(
+        makeSpace(
+          uuidNum: 320 + i,
+          spaceCode: 'B3-R$i',
+          lotCode: 'B3',
+          slotLabel: 'R$i',
+          isAccessiblePwd: i == 10, // Surveyed PWD / Accessible bay!
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b3-01',
+          distances: b3Dist,
+        ),
+      );
+    }
+
+    spaces.add(
+      makeSpace(
+        uuidNum: 341,
+        spaceCode: 'B3-C1',
+        lotCode: 'B3',
+        slotLabel: 'C1',
+        category: SpaceSlotCategory.formalCenterPainted,
         physicalStatus: 'available',
         allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 22, 'CICS': 48, 'CEAFA': 75},
+        producerId: 'occupancy-lot-b3-01',
+        distances: b3Dist,
       ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000402',
-        spaceCode: 'D-C02',
-        lotCode: 'D',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 25, 'CICS': 50, 'CEAFA': 78},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000403',
-        spaceCode: 'D-C03',
-        lotCode: 'D',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.96,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 28, 'CICS': 54, 'CEAFA': 82},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000404',
-        spaceCode: 'D-C04',
-        lotCode: 'D',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.97,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 32, 'CICS': 58, 'CEAFA': 86},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000405',
-        spaceCode: 'D-C05',
-        lotCode: 'D',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 35, 'CICS': 62, 'CEAFA': 90},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000406',
-        spaceCode: 'D-C06',
-        lotCode: 'D',
-        compatibility: 'car_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.95,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 38, 'CICS': 65, 'CEAFA': 94},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000407',
-        spaceCode: 'D-M01',
-        lotCode: 'D',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.99,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 18, 'CICS': 44, 'CEAFA': 70},
-      ),
-      SpaceDto(
-        spaceId: '30000000-0000-4000-8000-000000000408',
-        spaceCode: 'D-M02',
-        lotCode: 'D',
-        compatibility: 'motorcycle_only',
-        physicalStatus: 'available',
-        allocationStatus: 'unassigned',
-        confidence: 0.98,
-        lastObservedAtUtc: now.subtract(const Duration(seconds: 7)),
-        producerId: 'occupancy-lot-d-01',
-        buildingDistanceMeters: const {'RGR': 20, 'CICS': 46, 'CEAFA': 72},
-      ),
-    ];
+    );
+
+    for (var i = 1; i <= 3; i++) {
+      spaces.add(
+        makeSpace(
+          uuidNum: 350 + i,
+          spaceCode: 'B3-A$i',
+          lotCode: 'B3',
+          slotLabel: 'A$i',
+          category: SpaceSlotCategory.informalAisle,
+          physicalStatus: i == 1 ? 'occupied' : 'available',
+          allocationStatus: 'unassigned',
+          producerId: 'occupancy-lot-b3-01',
+          distances: b3Dist,
+        ),
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // LOT B4 — CET Building (Schematic Pending; empty until backend supplies)
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // LOT B5 — Overflow Lot (8 dynamic overflow bays)
+    // -------------------------------------------------------------------------
+    const b5Dist = {'CET': 110, 'STEERHUB': 125, 'CEAFA': 140, 'RGR': 150};
+    for (var i = 1; i <= 8; i++) {
+      final isMoto = i > 6;
+      final isOcc = i == 2;
+      spaces.add(
+        makeSpace(
+          uuidNum: 500 + i,
+          spaceCode: 'B5-OF0$i',
+          lotCode: 'B5',
+          slotLabel: 'OF0$i',
+          compatibility: isMoto ? 'motorcycle_only' : 'car_only',
+          physicalStatus: isOcc ? 'occupied' : 'available',
+          allocationStatus: isOcc ? 'assigned' : 'unassigned',
+          producerId: 'occupancy-lot-b5-01',
+          distances: b5Dist,
+        ),
+      );
+    }
+
+    return spaces;
   }
 
   // Official 7 Registered Producers (D01–D07)
@@ -829,10 +788,10 @@ class SentryFixtures {
       ),
       DeviceDto(
         deviceCode: 'D05',
-        producerId: 'occupancy-lot-a-01',
+        producerId: 'occupancy-lot-b1-01',
         deviceType: 'occupancy_camera',
-        displayName: 'Overhead Lot A–D Occupancy Vision Node',
-        locationLabel: 'STEER Hub & CEAFA Overhead Mast',
+        displayName: 'Overhead Lot B1–B5 Occupancy Vision Node',
+        locationLabel: 'CEAFA & STEER Hub Overhead Mast',
         reportedStatus: 'online',
         bootId: '70000000-0000-4000-8000-000000000005',
         sequenceNumber: 964,
@@ -840,7 +799,7 @@ class SentryFixtures {
         softwareVersion: 'sentry-occupancy-poly-v1.3.1',
         capabilities: const ['occupancy'],
         lastReceivedAtUtc: now.subtract(const Duration(seconds: 4)),
-        mappedLotCode: 'A',
+        mappedLotCode: 'B1',
       ),
       DeviceDto(
         deviceCode: 'D06',

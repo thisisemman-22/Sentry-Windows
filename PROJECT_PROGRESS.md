@@ -1,198 +1,409 @@
-# SENTRY · Project Progress, Status & Implementation Summary
+# SENTRY · Master Application Reference, Feature Summary & Change Audit Log
 
 > **Batangas State University — The National Engineering University (BatStateU TNEU)**  
 > **Alangilan Campus · Security Guard & ICT Administration Command Console**  
-> *Last Updated: November 12, 2026*
+> **System:** SENTRY (*Smart Entry, Navigation, Tracking, Recognition, and Yard Management* · `AI_Campus_Parking_System`)  
+> **Package / Version:** `campus_parking_desktop` · `v1.0.0+1` (`pubspec.yaml`)  
+> *Last Updated: November 24, 2026*
 
 ---
 
-## 1. Project Overview & Context
+### Quick-Reference Workspace & Agent Memory Card
 
-SENTRY is the intelligent campus access and yard management system for BatStateU TNEU Alangilan Campus. The application running in [`campus_parking_desktop/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop) serves as the primary **Guardhouse & ICT Administration Command Console**, designed to manage real-time vehicle entry/exit, 3-factor identity checks (Plate OCR, ArcFace biometric cosine similarity, ESP32 RFID), dual-state bay occupancy (Overhead camera vs. Backend reservation), guard exception handling, RA 10173 biometric enrollment, and campus parking logistics across **Lots A, B, C, and D**.
-
----
-
-## 2. GitHub Repository & Releases
-
-- **GitHub Repository:** [`https://github.com/thisisemman-22/Sentry-Windows`](https://github.com/thisisemman-22/Sentry-Windows) (Branch: `main`)
-- **Latest Release:** [`v1.0.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.0.0)
-- **Packaged Deliverables:**
-  - [`SENTRY-Windows-x64.zip`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-x64.zip) (`12.4 MB`): Portable Windows 10/11 x64 bundle containing [`SENTRY.exe`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-Release/SENTRY.exe) / [`campus_parking_desktop.exe`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-Release/campus_parking_desktop.exe).
-  - [`SENTRY-demo-release.apk`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-demo-release.apk) (`50.7 MB`): Standalone Android APK for mobile demonstration and testing (mock/offline mode, zero backend required).
-  - Ready-to-run folder: [`SENTRY-Windows-Release/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-Release).
+| Key | Value / Location |
+| :--- | :--- |
+| **Primary Git Repository** | [`C:\Users\emman\OneDrive\Documents\SENTRY\campus_parking_desktop`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop) |
+| **Outer Workspace & Deliverables** | [`C:\Users\emman\OneDrive\Documents\SENTRY`](file:///C:/Users/emman/OneDrive/Documents/SENTRY) |
+| **Flutter CLI Path (Windows)** | `C:\Users\emman\scoop\apps\flutter\current\bin` |
+| **GitHub Remote & Branch** | [`https://github.com/thisisemman-22/Sentry-Windows`](https://github.com/thisisemman-22/Sentry-Windows) (`origin/main`, latest pushed commit: `cb35298`) |
+| **Latest GitHub Release** | [`v1.1.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.1.0) (`SENTRY-Windows-x64.zip` `17.15 MB` + standalone `SENTRY.exe` `89 KB`; prior [`v1.0.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.0.0) also included `SENTRY-demo-release.apk` `50.7 MB`) |
+| **Ready-to-Run Windows Folder** | [`C:\Users\emman\OneDrive\Documents\SENTRY\SENTRY-Windows-Release`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-Release) |
+| **Team & Key Collaborators** | **Team 6 Desktop:** Emmanuel Tamboong (Team Leader — core architecture, auth, overview, Riverpod DI, HTTP/WS client, theme), Jarom Magtibay (`parking_management`, `administration`), Gate/Device & Review/Logs developers. **Backend Lead:** Patrick Carpio (FastAPI). **Design Reference:** James Villaflor (`design_reference/`). |
+| **Living Memory Protocol** | Whenever code, config, branding assets, tests, or releases change, update affected sections in **§§1–8** AND append a dated chronological entry to **§9 Chronological Project Progress & Audit Log**, keeping [`\SENTRY\PROJECT_PROGRESS.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/PROJECT_PROGRESS.md) and [`campus_parking_desktop\PROJECT_PROGRESS.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/PROJECT_PROGRESS.md) byte-for-byte synchronized. |
 
 ---
 
-## 3. What Has Been Completed
+## 1. System Overview & Core Purpose
 
-### A. Foundation, Toolchain & Architecture (Phases 1–3)
-- **Isolated Clean Scaffolding:** Configured inside [`campus_parking_desktop/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop) so that outer prompt notes, design mockups, and handoff files in `SENTRY/` are never mixed into the Git repository.
-- **Cross-Platform Target Support:** Windows Desktop (C++ Runner), Web (HTML5/Canvas), and Android (Gradle Release).
-- **Design Reference Alignment:** 
-  - Extracted exact brand tokens and styles from [`design_reference/index.html`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/design_reference/index.html) and [`design_reference/style.css`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/design_reference/style.css).
-  - Pure OLED dark mode (`#000000`) and BatStateU Crimson palette (`#C8102E`).
-  - Interactive cursor-tracking SENTRY shield logo ([`sentry_interactive_logo.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/sentry_interactive_logo.dart)) with eye pupil physics, perspective rim narrowing, and eyelid blink timers.
-- **Human-First Offline Typography:** Bundled 3 high-accessibility typefaces (SIL OFL) in [`assets/fonts/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/assets/fonts):
-  - **Schibsted Grotesk**: Editorial display headers and KPIs.
-  - **Atkinson Hyperlegible Next**: Braille Institute low-vision reading font for high-stress guard readability.
-  - **Atkinson Hyperlegible Mono**: Zero-ambiguity monospace figures for plates (`0` vs `O`, `1` vs `I`, `8` vs `B`), RFID tags, and similarity scores.
+**SENTRY (`campus_parking_desktop`)** is the mission-critical **Guardhouse & ICT Administration Command Console** for BatStateU TNEU Alangilan Campus. It provides campus security personnel and ICT administrators with real-time gate access telemetry, biometric/credential verification visibility, live parking bay allocation across BatStateU Alangilan's five surveyed campus parking lots (`B1–B5`), exception handling, CSV/PDF operational reporting, and participant/biometric onboarding.
 
-### B. UI/UX De-Cluttering & Progressive Disclosure
-- **Shared UI & Motion Kit:** Built in [`sentry_ui.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/ui/sentry_ui.dart) and [`motion.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/motion/motion.dart).
-- **Reduced Cognitive Load:** Replaced walls of uppercase text and raw UUIDs with single-takeaway cards (`SentryCard`, `MetricTile`, `CapacityBar`).
-- **Progressive Disclosure:** Technical details (UUIDs, confidence scores, ArcFace event triggers, building distance matrices) are abstracted behind `InfoHint` (`?`) tooltips or right-sliding sheets (`showDetailsSheet`).
-- **Responsive Mobile & Desktop Shell:** [`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart) adapts seamlessly:
-  - **Desktop / Wide Screen:** Collapsible sidebar (`Ctrl+B`), top telemetry bar, keyboard navigation (`Ctrl+1`…`7`, `Ctrl+Shift+L` theme toggle).
-  - **Mobile / Narrow Screen:** Converts sidebar to a Bottom Navigation Bar and drawer (`☰`).
-- **Demo Controls Sheet:** [`demo_controls_sheet.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/demo_controls_sheet.dart) consolidates all 9 test scenarios (`T01`–`T20`), roster switching, and network/session failure drills into an on-demand modal.
+### Core Capabilities
+- **Canonical Phase 4 Auth & Account Provisioning (`openapi.yaml 1.0.0-draft`, wire `1.0.0`):** Full 16-operation compliance with strict `additionalProperties: false`, `meta.request_id` tracing, `error.code`-only error routing, single-flight `/auth/refresh` token rotation (`0` retry grace), unmodified password handling (12–1024 Unicode code points, <=4096 UTF-8 bytes), signed-out Security Guard first-time activation & password reset, and Administrator per-intent `Idempotency-Key` registration/reclaim & OTP reissue/setup-grant recovery.
+- **3-Factor Gate Verification Monitoring:** Surfaces live YOLOv8 Plate OCR, ArcFace facial recognition (calibrated cosine similarity strictly displayed in `[-1.0, 1.0]`, never as percentages), and ESP32 RC522 RFID telemetry across 4 campus lanes (`lane-car-in`, `lane-car-out`, `lane-moto-in`, `lane-moto-out`).
+- **Dual-State Parking Management (`Lots B1–B5`):** Tracks BatStateU Alangilan's surveyed **Lots B1–B5** (92 mapped fixture slots: **`B1` CEAFA Left** `27` confirmed formal incl. center block `M1–M7` + `2` hatched unconfirmed far-end `L11`/`R11`; **`B2` Gym & STEER Hub** `10` violet `motorcycle_only` strip `MB10, 1–9` + `18` car + `4` dashed informal aisle `A1–A4`; **`B3` CEAFA Right** `20` formal incl. PWD `B3-R10` & teal center `B3-C1` + `3` informal aisle `A1–A3`; **`B4` CET Building** schematic pending + dynamic backend grid; **`B5` Overflow Lot** `8` bays), separating physical overhead camera status (`available`, `occupied`, `unknown`) from backend reservation state (`unassigned`, `held`, `assigned`), strictly excluding unconfirmed/informal/unknown/stale slots from free allocatable capacity, and maintaining a 7-building × 5-lot proximity priority matrix.
+- **Guard Exception Handling & Fallback Passage Attestation:** Enforces hard-denial safety boundaries, optimistic concurrency (`409 STALE_VERSION`), 30-second space hold / 20-second decision expiration guards, and a `"Confirm Vehicle Crossed Gate"` (`guard_attestation`) fallback flow.
+- **Role-Gated CSV & PDF Report Export:** Provides a top-right `Export Report` (`CSV` / `PDF`) dropdown + Export Options Dialog on Overview and Access Logs backed by `GET /api/v1/reports/export` (fail-closed in `DATA_SOURCE=real`, `// TODO(API): Confirm exact report export path with Patrick Carpio`) and `LocalReportGenerator` (`RFC-4180 CSV` & `%PDF-1.4`) + native `file_selector` save dialog in Developer Test Mode, hiding the `Audit Logs` scope from Guard sessions.
+- **Planned Post-Phase 4 Administration Extensions:** Retains Drivers & Vehicles (`P01–P06`), Legacy Manual User/Vehicle form, RA 10173 Facial Recognition Enrollment (file upload + live Windows webcam capture), and System Audit Log clearly labelled as planned extensions outside the frozen 16-operation Phase 4 contract.
 
-### C. All 8 Production Operational Views (Phases 4–11)
-1. **View 1: Authentication & Workstation Login** ([`login_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/login_screen.dart))
-   - Editorial 2-column layout, quick persona switcher (`Guard` vs `Admin`), 401 error handling, and RA 10173 data privacy notice.
-2. **View 2: Command Overview Dashboard** ([`overview_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_screen.dart))
-   - Confirmed post-passage vehicles inside campus (strictly separating pre-passage 30s holds), today's throughput, pending reviews, 4-lot capacity bars with dual-state physical vs. allocation breakdown.
-3. **View 3: Live Gate Monitoring** ([`live_gate_monitoring_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/live_gate_monitoring/presentation/live_gate_monitoring_screen.dart))
-   - 4 lanes (`lane-car-in`, `lane-car-out`, `lane-moto-in`, `lane-moto-out`), 4-step progress stepper, calibrated ArcFace cosine similarity in `[-1.0, 1.0]` (never as a percentage), and **"Confirm Vehicle Crossed Gate (`guard_attestation`)"** fallback modal requiring 10–500 char notes.
-4. **View 4: Guard Reviews & Exceptions** ([`guard_reviews_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/guard_reviews/presentation/guard_reviews_screen.dart))
-   - Master-detail queue, mandatory safety boundary (hard denials and expired attempts forbid approval), optimistic concurrency conflict detection (`409 STALE_VERSION`), and post-approval passage confirmation workflow.
-5. **View 5: Parking Management** ([`parking_management_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/parking_management_screen.dart))
-   - Interactive overhead lot blueprints (Lots A–D), 2-way driveway aisle, top-down vector vehicle renderings, occupancy conflict detection, and 7-building proximity priority matrix.
-6. **View 6: Access Logs & Lookup** ([`access_logs_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/access_logs_screen.dart))
-   - Confirmed campus visits (`GET /api/v1/access-visits`), gate attempt history, and participant/multi-vehicle lookup (`U007` multi-vehicle independence keeping `V007` and `V008` records unmerged, plus live updates when new users/vehicles are registered in View 8).
-7. **View 7: Device Monitoring** ([`device_monitoring_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/device_monitoring/presentation/device_monitoring_screen.dart))
-   - Health state for producers `D01`–`D07` (online, degraded, offline), uptime, sequence numbers, heartbeat simulator. If `D05` goes offline, mapped bays safely turn unknown/stale.
-8. **View 8: Administration, Manual Registration & RA 10173 Facial Enrollment** ([`administration_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/administration_screen.dart))
-   - Strictly gated to `role == 'administrator'` (`RoleRestrictedPanel` with `403 FORBIDDEN` explanation for Guards).
-   - **Tab 1 — Drivers & Vehicles (`P01–P06`):** Participant directory with vehicle additions, authorization toggles, and 1-click jump to facial enrollment.
-   - **Tab 2 — Manual User & Vehicle Registration (`POST /api/v1/admin/users/register`):** Full validation (`full_name`, optional/regex `user_code`, `email`, `role_code`, `building_code`, toggleable primary `vehicle_type`, normalized uppercase `plate_number`, and `rfid_uid`), inline field-level `409 DATABASE_CONFLICT` handling, `201 Created` confirmation banner, and 1-click **"Proceed to Facial Enrollment →"** button.
-   - **Tab 3 — Facial Recognition Enrollment (`GET / POST / DELETE /api/v1/admin/users/{user_id}/face-enrollment`):** Searchable user selector, mandatory **RA 10173 Data Privacy consent gate checkbox** (disables upload/webcam/submit until checked), native Windows file upload (`file_selector` `.jpg`/`.jpeg`/`.png`) + webcam frame capture, in-memory thumbnail staging that is purged immediately upon submission, and Enrollment Status Card with **"Revoke & Delete Embedding"** confirmation dialog.
-   - **Tab 4 — System Audit Log (`GET /api/v1/admin/audit-logs`):** Chronological record of guard attestations, reviews, user/vehicle registrations, and biometric template enrollments/revocations.
-
-### D. Real API Architecture Wiring (`DATA_SOURCE=real`) & Automated Tests
-- **Centralized `ApiClient` ([`api_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_client.dart)):**
-  - Configured with `connectTimeout: 3s` and `receiveTimeout: 5s`, `Authorization: Bearer <access_token>` injection from `SecureSessionStore`, and automatic `Idempotency-Key: <uuid_v4>` injection on all mutation requests (`POST`, `PATCH`, `PUT`, `DELETE`).
-  - Automatic single-attempt token refresh on `401` via `POST /api/v1/auth/refresh`; clears session and redirects to `LoginScreen` on refresh failure.
-  - Full `ApiEnvelope<T>` parsing and HTTP `401`/`403`/`409`/`410`/`422`/`429`/`500`/`503` error mapping (`ErrorCatalog` + `ApiFailure`) with strict fail-closed behavior in `DATA_SOURCE=real`.
-- **Real WebSocket Client ([`ws_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/ws_client.dart)):**
-  - `WsRealtimeClient` connects to `WS_BASE_URL` (`/api/v1/ws/updates`) using an encrypted handshake frame and strips any accidental bearer tokens from query URLs (`buildSanitizedWsUri`).
-  - Deduplicates `event_id`, tracks monotonic `stream_sequence`, triggers targeted invalidations across all 6 resource types (`access_attempt`, `access_visit`, `parking_assignment`, `parking_space`, `guard_review`, `device`), and handles close code `1008` session expiry.
-- **Complete Repository Wiring (`lib/features/*/data/`):**
-  - [`auth_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/data/auth_repository.dart), [`overview_providers.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/state/overview_providers.dart), [`gate_monitoring_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/live_gate_monitoring/data/gate_monitoring_repository.dart), [`guard_reviews_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/guard_reviews/data/guard_reviews_repository.dart), [`parking_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/data/parking_repository.dart), [`access_logs_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/data/access_logs_repository.dart), [`device_monitoring_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/device_monitoring/data/device_monitoring_repository.dart), and [`administration_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/data/administration_repository.dart).
-- **100% Passing Automated Tests (25/25 tests):**
-  - [`test/contracts_and_invariants_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/contracts_and_invariants_test.dart) (8 unit/contract invariant tests).
-  - [`test/widget_desktop_flow_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/widget_desktop_flow_test.dart) (End-to-end desktop flow test).
-  - [`test/api_and_admin_features_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/api_and_admin_features_test.dart) (12 unit & widget tests covering `ApiClient` interceptors, `Idempotency-Key` injection, `401` single-attempt token refresh, `403`/`409` mapping, WS URL token stripping, Manual User Registration `409` duplicate plate conflict, 1-click transition to Facial Enrollment, RA 10173 consent gate, embedding revocation, production-first `DATA_SOURCE=real` defaults, 5x logo tap unlock, and secret developer backdoor credentials).
-  - [`test/widget_overflow_audit_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/widget_overflow_audit_test.dart) (4 comprehensive regression suites auditing every screen, sub-tab, and modal across `1920x1080`, `1366x768`, `1280x720`, and `600x800` mobile preview drawer with zero `RenderFlex` overflows).
-- **Static Analysis:** `flutter analyze` reports `0 issues found`.
-
-### E. UI Polish, Motion Tuning, Brand Hero & Overflow Regression Audit (Prompt 2)
-- **Desktop Shell Navigation Upgrades ([`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart)):**
-  - **Grouped Sidebar:** Divided into 3 calm, labeled sections (`OPERATIONS`, `RECORDS & HARDWARE`, `SYSTEM`) with subtle separators in collapsed mode.
-  - **Command Palette (`Ctrl+K`):** Global quick-jump search palette allowing operators to search and instantly jump to any of the 7 views, registered participants, or plate numbers.
-  - **Compact 56px Top Bar:** Features a clean connection indicator (`Live` / `Out of date`), quick-jump trigger, mode telemetry pill (`LIVE` vs `MOCK` + per-second tabular Manila clock), and animated theme toggle (`Ctrl+Shift+L`).
-  - **Calibrated Motion Transitions:** Tuned view switching to a snappy `220ms` combined fade and 1.5% horizontal slide curve (`SentryMotion.emphasized`), replacing sluggish transitions.
-- **Prominent Interactive Logo Hero ([`sentry_interactive_logo.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/sentry_interactive_logo.dart)):**
-  - **Login Hero (`login_screen.dart`):** Prominently placed inverted crimson logo (`size: 132`) with 3 concentric, animated pulse sonar rings.
-  - **Desktop Shell Header:** 38px logo placed at the top of the sidebar.
-  - **Empty Gate State (`live_gate_monitoring_screen.dart`):** Interactive 48px logo with calm "Gate idle — monitoring for incoming vehicle" messaging.
-- **Strict 8px Spatial Rhythm & Responsive Layout Hardening:**
-  - Applied the 3-point surface rule (Canvas, Card, Raised) with subtle borders (`0.65 alpha`) and zero visual clutter.
-  - **Live Gates (`live_gate_monitoring_screen.dart`):** Responsive 4-lane cards (2x2 grid below 1080px, 1-column below 620px), flexible status pill text.
-  - **Device Monitoring (`device_monitoring_screen.dart`):** Responsive LayoutBuilder with expanded device details and wrapping status buttons.
-  - **Administration (`administration_screen.dart`):** Responsive LayoutBuilder for Operator Session Card, `isExpanded: true` on all dropdowns, responsive audit log list, wrapping vehicle badges in Driver Directory.
-  - **Guard Reviews (`guard_reviews_screen.dart`):** Responsive inspector header with expanded reason title and wrapping conflict/info actions.
-  - **Access Logs (`access_logs_screen.dart`):** Responsive visit rows and gate attempt history with expanded message text and wrapping badges.
-  - **Overview (`overview_screen.dart`):** Responsive `_LotSummaryRow` right column with stacked free count and status pill, responsive `SectionHeader` with narrow-width title/trailing stacking.
-  - **Parking Management (`parking_management_screen.dart`):** Min-height constrained bay cards with wrapping physical, allocation, and conflict status pills.
-- **Zero-Overflow Regression Test Suite ([`test/widget_overflow_audit_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/widget_overflow_audit_test.dart)):**
-  - Iterates every screen, sub-tab, and dialog modal across `1920x1080`, `1366x768`, `1280x720`, and `600x800` (mobile preview drawer).
-  - Asserts zero `RenderFlex` overflow errors across all window dimensions.
-
-### F. Production-First Default (`DATA_SOURCE=real`), Secret Developer Backdoor, Real Webcam Capture & UI Fixes (Prompt 3)
-- **Production-First Default (`DATA_SOURCE=real`):**
-  - Updated [`config/local.example.json`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/config/local.example.json) and [`app_config.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/config/app_config.dart) to default to `APP_ENV="production"`, `DATA_SOURCE="real"`, `API_BASE_URL="https://API_URL_PLACEHOLDER.local:8000"`, and `WS_BASE_URL="wss://API_URL_PLACEHOLDER.local:8000/api/v1/ws/updates"` with explicit `// TODO(API)` placeholders for Patrick's live FastAPI URL.
-  - Removed all fake/pre-populated records, simulator buttons (`Cycle camera state`, `Simulate encounter`, simulated device status toggles, `MOCK` top-bar pill, and pre-filled demo login chips) from production mode, replacing them with clean empty/offline states and **Retry** buttons.
-- **Hidden Developer Backdoor (Secret Test Mode):**
-  - **Secret Credentials:** Entering `emman.dev@sentry.internal` and `SENTRY-DEV-4102!` on [`login_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/login_screen.dart) bypasses HTTP `POST /api/v1/auth/login`, switches the active session to `DataSourceMode.mock` in memory, loads the `U001–U007` fixtures, and logs in as `Administrator (Emmanuel Tamboong)`.
-  - **Secret Gesture & Shortcut:** Clicking `SentryInteractiveLogo` 5 times within 2 seconds on `LoginScreen` (or pressing `Ctrl+Shift+Alt+D` anywhere) enables Developer Test Mode for the session with a `"Developer Test Mode Enabled"` toast.
-- **Real Windows Webcam Capture (`camera` / `camera_windows`):**
-  - Integrated `camera` and `camera_windows` in [`administration_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/administration_screen.dart) (`_WindowsWebcamCaptureDialog` with live `CameraPreview` and **Capture Frame** button returning actual JPEG/PNG `Uint8List` bytes).
-  - Strictly fails closed in production mode when no physical webcam is connected: *"No Windows webcam detected. Use 'Upload Face Images' to select photos from disk."*
-- **Visual & Overflow Fixes:**
-  - Shortened Overview KPI label to `"Confirmed inside"` (`12px` single-line with `Expanded` + `TextOverflow.ellipsis`).
-  - Shortened `review_required` status pill to `"Review"` and added `"Idle"` pill state for empty lanes, plus prominent `"Confirm Vehicle Crossed Gate"` action button in [`live_gate_monitoring_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/live_gate_monitoring/presentation/live_gate_monitoring_screen.dart).
-  - Styled [`access_logs_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/access_logs_screen.dart) and global `ChipThemeData` filter chips with `#C8102E` crimson selected background + `#FFFFFF` text/icon in both Light and Dark modes, and explicit high-contrast unselected colors (`#F1F5F9`/`#E2E8F0`/`#0F172A` in Light; `#18181C`/`#24242A`/`#FFFFFF` in Dark).
-  - Cleaned up sidebar footer operator chip (`Emmanuel Tamboong`) with full-name tooltip and zero truncation clutter.
+### Principal Boundary & FastAPI Authority Rule
+- **Target Principals:** Strictly **Security Guards (`guard`)** and **ICT Administrators (`administrator`)**. After `POST /api/v1/auth/login` issues a token pair, `GET /api/v1/me` verifies the canonical role; mobile-only roles (`student`, `faculty`, `staff`) are immediately rejected with `"Please use the SENTRY Mobile Application"`, logged out (`POST /api/v1/auth/logout`), and cleared from local storage.
+- **Strict Guard Role Isolation:** Guard sessions never render `Administration`, the `SYSTEM` sidebar group, `Ctrl+7` / Command Palette links to Administration, signed-out flows inside the shell, or instantiate Admin-only providers (`DesktopViewRouter` redirects `DesktopNavTab.administration` to `OverviewScreen`). Both Guards and Administrators have access to **My profile** and **Change password**.
+- **FastAPI Is the Sole Authority:** No direct local database credentials, no direct LAN IP-camera or ESP32 barrier actuation, no client-side authorization fabrication, and strict **fail-closed** behavior when running in `DATA_SOURCE=real`.
 
 ---
 
-## 4. Architectural Invariants & Contract Adherence Table
+## 2. Architecture, Tech Stack & Codebase Map
 
-| Invariant / Contract Rule | Implementation Status | Enforcement Location |
+### Tech Stack & Dependencies (`pubspec.yaml`)
+- **Dart SDK Constraint:** `>=3.2.0 <4.0.0` | **Flutter Targets:** Windows Desktop (primary C++ runner), Web, and Android.
+- **State Management & DI:** `flutter_riverpod` (`^2.5.1`).
+- **Networking & Realtime:** `dio` (`^5.4.3+1`), `web_socket_channel` (`^2.4.5`), `uuid` (`^4.4.0`).
+- **Hardware, Media & Files:** `camera` (`^0.12.2`) + `camera_windows` (`^0.3.0+1`), `file_selector` (`^1.0.3`).
+- **UI, Motion & Formatting:** `flutter_animate` (`^4.5.0`), `animations` (`^2.0.11`), `intl` (`^0.19.0`), `shared_preferences` (`^2.2.3`).
+
+### Repository Directory & File Map
+
+```text
+campus_parking_desktop/
+├── assets/
+│   ├── branding/                  # Master SVG, 1024/512/256 PNGs, card tile, inverted, app_icon.ico
+│   └── fonts/                     # Offline SIL OFL 1.1 fonts (Schibsted Grotesk, Atkinson Hyperlegible Next/Mono)
+├── config/
+│   ├── local.example.json         # Production default config template (APP_ENV=production, DATA_SOURCE=real)
+│   └── demo.example.json          # Local FastAPI LAN/loopback adapter template (http://127.0.0.1:8000)
+├── lib/
+│   ├── main.dart                  # Application entry point
+│   ├── app/
+│   │   ├── app.dart               # Root MaterialApp, Listener (SentryPointer), fail-closed config error screen
+│   │   ├── desktop_shell.dart       # 3-section sidebar, 56px top bar, Ctrl+K palette, About modal, mobile drawer
+│   │   ├── router.dart              # DesktopViewRouter mapping DesktopNavTab to Views 2–8
+│   │   ├── providers.dart           # Riverpod DI graph, AuthController, hidden dev backdoor, WS/API wiring
+│   │   └── demo_controls_sheet.dart   # Mock-mode-only side sheet (9 test scenarios T01–T20, roster & outage drills)
+│   ├── core/
+│   │   ├── config/                  # app_config.dart, roster_mode.dart
+│   │   ├── motion/                  # motion.dart (SentryMotion curves, Reveal, BentoReveal & AnimatedCount)
+│   │   ├── network/                 # api_client.dart, api_envelope.dart, phase4_contract.dart, ws_client.dart, secure_session_store.dart
+│   │   ├── theme/                   # sentry_colors.dart, sentry_theme.dart
+│   │   └── widgets/                 # sentry_interactive_logo.dart, status_pills.dart, plate_badge.dart,
+│   │                                # freshness_banner.dart, role_restricted_panel.dart, vehicle_top_down_svg.dart, ui/sentry_ui.dart
+│   ├── features/
+│   │   ├── authentication/          # View 1: data/auth_repository.dart, presentation/{login_screen.dart,
+│   │   │                            # guard_activation_dialog.dart, guard_password_reset_dialog.dart, change_password_dialog.dart}
+│   │   ├── overview/                # View 2: state/overview_providers.dart,
+│   │   │                            # presentation/{overview_screen.dart, spatial_glass.dart, campus_aerial_painter.dart, campus_tactical_map.dart, overview_charts.dart}
+│   │   ├── live_gate_monitoring/    # View 3: data/gate_monitoring_repository.dart, presentation/live_gate_monitoring_screen.dart
+│   │   ├── guard_reviews/           # View 4: data/guard_reviews_repository.dart, presentation/guard_reviews_screen.dart
+│   │   ├── parking_management/      # View 5: data/parking_repository.dart, presentation/{parking_management_screen.dart, lot_blueprint_canvas.dart}
+│   │   ├── access_logs/             # View 6: data/access_logs_repository.dart, presentation/{access_logs_screen.dart, report_export_dialog.dart}
+│   │   ├── device_monitoring/       # View 7: data/device_monitoring_repository.dart, presentation/device_monitoring_screen.dart
+│   │   └── administration/          # View 8: data/{administration_repository.dart, admin_registration_api.dart, dto/phase4_admin_dtos.dart},
+│   │                                # state/register_form_controller.dart,
+│   │                                # presentation/{administration_screen.dart, activation_help_page.dart, receipt_dialog.dart}
+│   └── shared/
+│       ├── fixtures/                # scenario_simulator.dart, synthetic_fixtures.dart (U001–U007, V001–V008, D01–D07, Lots B1–B5)
+│       └── models/                  # attempt_models.dart, audit_models.dart, auth_models.dart, device_models.dart,
+│                                    # event_envelope.dart, parking_models.dart, participant_models.dart, review_models.dart, visit_models.dart
+├── test/                          # 9 automated test suites (55 tests total + 149 contract fixtures in test/fixtures/contract/)
+├── windows/runner/                # C++ runner: main.cpp, Runner.rc, resources/app_icon.ico
+├── android/app/src/main/          # AndroidManifest.xml, mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png
+└── web/                           # index.html, manifest.json, favicon.png, icons/Icon-*.png
+```
+
+### Riverpod State & DI Graph ([`lib/app/providers.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/providers.dart))
+- **`devModeUnlockedProvider`** (`StateProvider<bool>`, default `false`): Runtime gate for Developer Test Mode; reset to `false` on sign-out.
+- **`appConfigProvider`** (`Provider<AppConfig>`): Reads `AppConfig.fromEnvironment()` (`DATA_SOURCE=real` default) and overrides to `DataSourceMode.mock` in memory only while `devModeUnlockedProvider` is `true`.
+- **`themeModeProvider`** (`StateProvider<ThemeMode>`, default `ThemeMode.light`): Toggles between Light Mode and Pure OLED Dark Command Mode (`Ctrl+Shift+L`).
+- **`globalPointerPositionProvider`** & **`SentryPointer.position`**: Tracks cursor coordinates; the root `Listener` writes to `SentryPointer.position` (`ValueNotifier<Offset?>`) so the shield eyes animate smoothly without rebuilding the widget tree.
+- **`sessionStoreProvider`**: Supplies `InMemorySessionStore` (`SecureSessionStore`).
+- **`wsCoordinatorProvider`**, **`apiClientProvider`**, **`wsRealtimeClientProvider`**: Core network stack; `WsRealtimeClient` triggers `sentryScenarioProvider.notifier.forceFullSnapshotResync()` on targeted invalidations or resync events, and `AuthController.expireSessionWith1008()` on WS close code `1008` / HTTP `401` refresh failure.
+- **`authControllerProvider`**: Manages `AuthState` (`SessionDto?`, `infoBanner`, loading/error/expired banners), two-step `signIn()` (`POST /auth/login` + `GET /me` role check), unconditional `signOut()`, `changePassword()`, `applyRefreshedSession()`, `setLoginInfoBanner()`, and `switchDemoPersona()`.
+- **`adminRegistrationApiProvider` & `registerFormControllerProvider`**: Lazy Admin-only providers backing Phase 4 `Account registration` (`Idempotency-Key` lifecycle preserved across silent token refreshes & same-account re-sign-in; reset only on different-account sign-in or Clear). Never instantiated during Guard sessions.
+- **`sentryScenarioProvider`**: Unified state coordinator (`SentryScenarioController` / `SentrySystemState`) bridging live FastAPI repositories in `real` mode and deterministic simulation in `mock` mode.
+- **Navigation Providers:** `selectedDesktopTabProvider` (`DesktopNavTab.overview` default), `focusedLaneProvider` (`'lane-car-in'` default), `selectedParkingLotProvider` (`'B1'` default), and `sidebarCollapsedProvider` in [`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart).
+- **8 Repository Providers + Phase 4 Admin API:** `authRepositoryProvider`, `adminRegistrationApiProvider`, `overviewRepositoryProvider`, `gateMonitoringRepositoryProvider`, `guardReviewsRepositoryProvider`, `parkingRepositoryProvider`, `accessLogsRepositoryProvider`, `deviceMonitoringRepositoryProvider`, and `administrationRepositoryProvider`.
+
+---
+
+## 3. Complete Feature & Screen Inventory
+
+### Global Shell & Cross-Cutting Features
+- **Fail-Closed Configuration Screen ([`app.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/app.dart)):** At startup, if `config.validateForRealMode()` detects an invalid `API_BASE_URL` (not `http*`) or `WS_BASE_URL` (not `ws*`), `SentryDesktopApp` renders `_RealModeConfigErrorScreen` and refuses to fall back to mock data.
+- **Responsive Shell ([`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart)) & Router ([`router.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/router.dart)):**
+  - **Floating Bento Rounded Sidebar & Role Guard:** Floating translucent card rail (`margin: (12, 12, 0, 12)`, `borderRadius: 20`, `252px` expanded / `84px` collapsed) with crimson-tinted active pill navigation (`180ms Curves.easeOutCubic`), bottom utility bar hosting the OLED Dark/Light theme switch (`sidebar_theme_toggle`) and collapse toggle (`sidebar_collapse_toggle`, `Ctrl+B`), split into 3 labeled sections:
+    1. `OPERATIONS` — Overview, Live Gates, Reviews
+    2. `RECORDS & HARDWARE` — Parking, Access Logs, Devices
+    3. `SYSTEM` — Administration (**visible to `administrator` only**; completely hidden from `guard` sidebar, `Ctrl+1..N` shortcuts, Command Palette, and blocked by `DesktopViewRouter` RoleGate)
+  - **Mobile Adaptation (`width < 760px`):** Converts sidebar into a Material `NavigationBar` (first 5 views) plus a slide-out `Drawer` filtered by operator role, and moves the theme switch into the compact Top Bar.
+  - **Compact 56px Top Bar:** Shows live WebSocket status wrapped in `FittedBox(fit: BoxFit.scaleDown)` (prevents horizontal RenderFlex overflows), Command Palette trigger (`Ctrl+K`), and tabular `Asia/Manila` clock.
+  - **Calibrated View Transitions:** `220ms` combined fade + `1.5%` horizontal slide (`Curves.easeOutCubic` / `Curves.easeInCubic`).
+  - **Global Command Palette (`Ctrl+K`):** Quick-jump modal filtered by operator role to navigate views or search participants/plates.
+  - **Operator Footer Menu & Account Modals:** Null-safe during sign-out transitions (`if (profile == null) return const SizedBox.shrink()`). Opens menu with **My profile** (`showOwnProfileDialog`, all 7 canonical `ProfileData` fields), **Change password** (`showChangePasswordDialog` for both Guard & Admin), **About SENTRY** (displays interactive 72px shield logo, BatStateU attribution, `v1.0.0 · Production Release · RA 10173 Compliant`), and **Sign out** (calls `POST /api/v1/auth/logout` with `{}` in real mode, clears session, resets `devModeUnlockedProvider` and `sentryScenarioProvider` back to clean `real` mode).
+- **Shared UI & Motion Kit ([`sentry_ui.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/ui/sentry_ui.dart), [`motion.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/motion/motion.dart)):**
+  - `SentryCard`, `FrostedSurface` (`BackdropFilter` sigma <= `10.0`), `MetricTile`, `CapacityBar`, `InfoHint` progressive disclosure tooltips, right-sliding `showDetailsSheet` (optional `frosted: true`), `BentoReveal` (`220ms` entrance / `40ms` stagger, zero-Timer `AnimationController`), `AnimatedCount` (`350ms` + tabular figures), `StatusPill`, `PlateBadge`, `FreshnessBanner`, `VehicleTopDownSvg`, and `showSentryToast`.
+
+#### Global Keyboard Shortcuts
+| Shortcut | Action | Scope |
+| :--- | :--- | :--- |
+| `Ctrl+1` … `Ctrl+7` | Jump directly to Views 2–8 (`Overview` through `Administration`) | Authenticated `DesktopShell` |
+| `Ctrl+B` | Collapse / expand desktop sidebar rail | Authenticated `DesktopShell` |
+| `Ctrl+K` | Open global Command Palette quick-jump modal | Authenticated `DesktopShell` |
+| `Ctrl+Shift+L` | Toggle Light Mode ↔ Pure OLED Dark Command Mode | Authenticated `DesktopShell` |
+| `Ctrl+Shift+Alt+D` | Unlock Developer Test Mode for active session *(hidden)* | `LoginScreen` & `DesktopShell` |
+
+---
+
+### Operational Views (Views 1–8)
+
+1. **View 1 — Workstation Authentication ([`login_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/login_screen.dart))**
+   - Editorial 2-column split layout featuring the batStateU crimson card hero with 3 animated sonar rings and `SentryInteractiveLogo.inverted(size: 132)`.
+   - Uses `'University ID'` identifier label + unmodified password input (never trimmed; zero hints leak hidden dev unlock mechanisms). Starts completely blank (`''`) in `real` mode.
+   - Includes signed-out **`First-time activation (Security Guards only)`** ([`guard_activation_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/guard_activation_dialog.dart)) and **`Forgot password? (Security Guards only)`** ([`guard_password_reset_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/guard_password_reset_dialog.dart)) flows enforcing 12–1024 Unicode code point / <=4096 UTF-8 byte policy and `Retry-After` cooldowns.
+   - Renders generic `"Sign-in failed"` on `401 AUTHENTICATION_FAILED`, rejects mobile-only roles (`student`, `faculty`, `staff`) with `"Please use the SENTRY Mobile Application"` after `GET /api/v1/me`, and surfaces `meta.request_id` on errors.
+
+2. **View 2 — Spatial Command Overview Dashboard ([`overview_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_screen.dart), [`spatial_glass.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/spatial_glass.dart), [`campus_aerial_painter.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/campus_aerial_painter.dart), [`campus_tactical_map.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/campus_tactical_map.dart), [`overview_charts.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_charts.dart))**
+   - **Full-Bleed Aerial Canvas + Floating Smoked-Glass Command Overlay (Vinora OS Spatial Paradigm):** Full-bleed aerial campus canvas (`CampusAerialPainter` + `CampusMapLayout` rendering shaded foliage clusters, CEAFA/GYM/CET/REGISTRAR roofs, striped Lots `B1–B5`, Main Gate beacon, and scale bar) with floating `SpatialGlass` / `GlassTile` panels overlaid across the bottom chart dock (`CampusMixDonutCard` concentric 270° rings + `GateActivityBarChartCard` full-height capsule bar tracks with crimson peak glow) and right telemetry rail (`Campus overview` 2×2 KPI tiles with `MiniSparkline`, `LollipopStemMicroChart`, and ticked `CapacityRadialGauge`, `_ActiveGateEncounterCard` with 4-segment verification pills, and `_RecentActivityGlassCard`). Includes top-left floating search pill (`Ctrl+K`), **`Export Report` (`CSV` / `PDF`)** (`ExportReportMenuButton`), `Gate lanes` quick jump, and horizontal scrollable `map_layer_*` filter pills (`All bays`, `Available`, `Held`, `Conflicts`, `Motorcycles`). Clicking any stem-pin lot performs animated `InteractiveViewer` zoom-to-lot (`320ms`) and reveals a frosted-glass callout card with miniature bay map (`_MiniBayPainter`), conflict/hold `SoftChip`s, `Camera vs. reservation breakdown`, and crimson `Open lot blueprint` navigation. Compresses smoothly to a scrollable layout on viewports `< 1020px × 640px`.
+   - **Bottom Bento Strip & Telemetry Rail:** Animated `CampusMixDonutCard` (`By Lot` / `Vehicles` mode, `400ms`), hourly `GateActivityBarChartCard` with peak BatStateU Crimson bar & `Peak: X/hr` pill when live data exists, 2×2 KPI micro-cards (**`Confirmed inside`** + `MiniSparkline`, **`Active gate lanes`**, **`Pending reviews`**, **`Campus capacity`** + animated `CapacityRadialGauge`), `_ActiveGateFocusCard` with direct jump to Live Gates, compact recent activity feed, and device health card.
+   - **Production Cleanliness:** Renders `—` KPIs, empty chart frames (`"Awaiting live telemetry"` with zero fake `Peak:` badges), `"Awaiting parking lot telemetry"`, and `"No recent gate activity"` in disconnected `real` mode.
+
+3. **View 3 — Live Gate Monitoring ([`live_gate_monitoring_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/live_gate_monitoring/presentation/live_gate_monitoring_screen.dart))**
+   - Monitors all 4 campus lanes (`lane-car-in`, `lane-car-out`, `lane-moto-in`, `lane-moto-out`) using a responsive 4 / 2×2 (`<1080px`) / 1-column (`<620px`) grid.
+   - Displays 4-step verification progress stepper, license plate + OCR confidence, RFID tag UID (for motorcycles), and ArcFace facial verification strictly formatted as raw **cosine similarity `[-1.0, 1.0]`**.
+   - Enforces **30-second space hold** and **20-second decision expiration** countdowns; expired holds block passage confirmation and automatically release held bays.
+   - Includes **"Confirm Vehicle Crossed Gate"** (`guard_attestation`) fallback action requiring 10–500 character audit notes.
+   - Unoccupied lanes display calm `"Idle — Waiting for vehicle"` cards with an interactive 48px shield logo (`"Simulate encounter"` strictly gated behind Developer Test Mode).
+
+4. **View 4 — Guard Reviews & Exceptions ([`guard_reviews_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/guard_reviews/presentation/guard_reviews_screen.dart))**
+   - Master-detail exception queue for uncertain gate evaluations.
+   - **Mandatory Safety Boundary:** `Approve` is disabled/forbidden for hard security denials (`UNKNOWN_CREDENTIAL`, `CREDENTIAL_REVOKED`, `IDENTITY_MISMATCH`, `USER_INACTIVE`, `VEHICLE_INACTIVE`, `ACTIVE_VISIT_NOT_FOUND`, `DUPLICATE_ACTIVE_VISIT`, `GUARD_DENIED`) and expired attempts.
+   - Enforces optimistic concurrency (`expected_attempt_version`) catching `409 STALE_VERSION`, and prompts post-approval passage confirmation when appropriate.
+   - Defaults to `"No pending guard reviews"` in clean `real` mode; stale-version test action gated behind Developer Test Mode.
+
+5. **View 5 — Parking Management ([`parking_management_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/parking_management_screen.dart), [`lot_blueprint_canvas.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/lot_blueprint_canvas.dart))**
+   - Spatial architectural drafting grid (`_ArchitecturalGridPainter`) for **Lots B1–B5** with floating translucent top-left lot tabs (`floatingTabStrip`), bottom-left floating legend chips (`Free`, `Held 30s`, `Occupied`, `Conflict`, `PWD / Accessible`, `Motorcycle`, `Informal Aisle`, `Unknown`), bottom-right floating zoom/reset controls (`-`, `Reset`, `+`) driving animated `220ms` `InteractiveViewer` zoom/pan, top-down vector vehicle graphics ([`vehicle_top_down_svg.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/vehicle_top_down_svg.dart)), diagonal-hatched unconfirmed far-end bays (`_DiagonalHatchPainter` on `B1-L11`/`R11`), dashed informal aisle zones (`_DashedBorderPainter` on `B2-A1..A4` & `B3-A1..A3`), violet `B2` motorcycle strip (`MB10, 1–9`), `B3` PWD bay (`R10`) + teal center bay (`C1`), `B4` schematic-pending banner/dynamic backend grid, `B5` Overflow Zone pill, and configurable backend `zone_name` overrides.
+   - Selecting any bay highlights it with an animated crimson/emerald ring and slides in the frosted **Bay Inspector Drawer** (`showDetailsSheet(..., frosted: true)`) surfacing slot category, camera/reservation dual-state, hold/visit metadata, and (in Developer Test Mode) state cycling. Strictly excludes unconfirmed, informal aisle, unknown, or stale bays from allocatable free capacity.
+   - Includes the **7-Building × 5-Lot (`B1–B5`) Proximity Priority Matrix** (`CET`, `REGISTRAR`, `STEERHUB`, `FITNESS CENTER`, `CEAFA`, `CICS`, `RGR`).
+   - Disconnected `real` mode renders a centered frosted `"Awaiting lot telemetry"` overlay without occupied/conflict/held legend leakage; `"Cycle camera state"` simulator button is strictly gated behind Developer Test Mode.
+
+6. **View 6 — Access Logs & Lookup ([`access_logs_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/access_logs_screen.dart), [`report_export_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/report_export_dialog.dart))**
+   - 3 sub-views: **Confirmed Visits** (`GET /api/v1/access-visits`), **Gate Attempts** history, and **Participant & Multi-Vehicle Lookup**, plus a top-right **`Export Report` (`CSV` / `PDF`)** `MenuAnchor` dropdown opening the Export Options Dialog (Format `CSV`/`PDF`, role-gated Scope hiding `Audit Logs` from Guards, Date Range `Today`/`Last 7 Days`/`Last 30 Days`/`Custom`), wired to `GET /api/v1/reports/export` in `real` mode and `LocalReportGenerator` + `file_selector` in Developer Test Mode.
+   - Enforces **Multi-Vehicle Independence (`U007`)**: separate vehicles owned by one user (`V007` and `V008`) maintain distinct histories without merging records, and reflects newly registered admins/drivers immediately.
+   - Styled with high-contrast BatStateU Crimson (`#C8102E`) selected filter chips. Empty states in `real` mode show `"No campus visits recorded"`, `"No gate attempts recorded"`, and `"No registered drivers loaded"`.
+
+7. **View 7 — Device Monitoring ([`device_monitoring_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/device_monitoring/presentation/device_monitoring_screen.dart))**
+   - Telemetry cards for all 7 edge/client producers (`D01`–`D07`): reported status (`online` / `degraded` / `offline`), boot ID, monotonic sequence number, uptime, software version, and capabilities.
+   - Taking overhead occupancy node `D05` offline safely propagates `unknown`/stale state to mapped parking bays so unavailable bays are never advertised as open.
+   - Empty state shows `"No site devices loaded"`; inline simulator buttons (`Online`, `Degraded`, `Offline`) are gated behind Developer Test Mode.
+
+8. **View 8 — Administration ([`administration_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/administration_screen.dart))**
+   - Strictly accessible to `UserRole.administrator` only (`if (!isAdmin) return const SizedBox.shrink()`, enforced before routing by `DesktopViewRouter`). Operator Session Card exposes **`Change password`** (`showChangePasswordDialog`) beside **Sign out**.
+   - **Tab 0 — Account Registration (`_Phase4AccountRegistrationCard` + [`register_form_controller.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/state/register_form_controller.dart)):** Executes canonical Phase 4 `registerStudentOrGuard`, `reclaimStudentOrGuardRegistration`, `registerFacultyOrStaff`, and `reclaimFacultyOrStaffRegistration` with strict per-intent `Idempotency-Key` lifecycle, manual retry on `503`/`403`, persistent fail-closed attestation warning on Faculty/Staff flows (clearing obscured `attestation.reference` immediately on `202`), `Retry-After` cooldown timer, `meta.request_id` display, and [`receipt_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/receipt_dialog.dart) showing opaque `registration_id` + Manila PHT expiry + all 5 `ActivationCodeDelivery` descriptions.
+   - **Tab 1 — Activation Help ([`activation_help_page.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/activation_help_page.dart)):** Validates canonical `registration_id` UUID (never `user_id`/`email`), shows the 4-row Recovery Matrix, requires explicit modal confirmation before calling `reissueActivationCode` (`/otp/reissue`) or `recoverPasswordSetup` (`/password-setup/recover`) without auto-chaining or retrying on `503`, and enforces `429` cooldowns.
+   - **Tab 2 — Facial Enrollment *(Planned Extension)*:** Searchable user selector, mandatory RA 10173 Data Privacy consent checkbox gating upload/webcam/submit, file upload + live Windows webcam capture, immediate frame purge, and embedding revocation.
+   - **Tab 3 — Drivers & Vehicles *(Planned Extension)*:** Participant directory (`P01–P06`), adding secondary vehicles, toggling authorization states, plus toggleable legacy prototype Manual User & Vehicle form (`POST /api/v1/admin/users/register`) linking into Facial Enrollment.
+   - **Tab 4 — System Audit Log *(Planned Extension)*:** Chronological telemetry feed (`GET /api/v1/admin/audit-logs`).
+
+---
+
+## 4. Backend API, WebSocket & Architectural Invariants
+
+### HTTP API Client Rules ([`api_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_client.dart), [`api_envelope.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_envelope.dart), [`phase4_contract.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/phase4_contract.dart))
+- **Timeouts & Headers:** `connectTimeout: 3s`, default `receiveTimeout: 8s` (supports `>=3s` server timing padding on password reset), `Accept: application/json`, `Content-Type: application/json`, `X-Request-ID` & `Retry-After` header extraction.
+- **Single-Flight Token Refresh:** `refreshSessionSingleFlight()` coordinates concurrent expired-clock or `401` callers onto one `POST /api/v1/auth/refresh` (`{"refresh_token": ...}` only, `no retry grace` — `401`/`503`/failure immediately clears `SecureSessionStore` without replay). Read-only `GET` requests retry at most once after refresh; state-changing mutations (`POST`/`PATCH`/`DELETE`) NEVER auto-replay.
+- **Strict Contract Envelope & Errors:** Enforces `{ok, data, error, meta}` with `meta.contract_version == "1.0.0"`, `additionalProperties: false`, zero-mutation secret logging, and sealed `Phase4ApiFailure` dispatch strictly by `error.code` (never inspecting `error.message`). Never falls back to mock success in `DATA_SOURCE=real`.
+
+### Canonical Phase 4 Auth & Account Operations (16 OpenAPI Operations · `1.0.0-draft`)
+| Group | Operation / Method & Path | Repository / API Method | Access |
+| :--- | :--- | :--- | :--- |
+| **Auth** | `login` (`POST /api/v1/auth/login`) | `AuthRepository.login` | Public (Desktop Guard/Admin result) |
+| **Auth** | `refreshTokens` (`POST /api/v1/auth/refresh`) | `AuthRepository.refreshTokens` / `ApiClient` | Refresh Token (`0` retry grace) |
+| **Auth** | `logoutCurrentSession` (`POST /api/v1/auth/logout`) | `AuthRepository.logoutCurrentSession` (`{}`) | Guard / Admin |
+| **Profile** | `getOwnProfile` (`GET /api/v1/me`) | `AuthRepository.getOwnProfile` | Guard / Admin (Mobile roles rejected) |
+| **Password** | `changePassword` (`POST /api/v1/auth/password/change`) | `AuthRepository.changePassword` | Guard / Admin |
+| **Guard Reset** | `requestPasswordReset` (`POST /api/v1/auth/password-reset/request`) | `AuthRepository.requestPasswordReset` | Signed-out Guard (`202`, `>=3s`) |
+| **Guard Reset** | `verifyPasswordReset` (`POST /api/v1/auth/password-reset/verify`) | `AuthRepository.verifyPasswordReset` | Signed-out Guard |
+| **Guard Reset** | `completePasswordReset` (`POST /api/v1/auth/password-reset/complete`) | `AuthRepository.completePasswordReset` | Signed-out Guard |
+| **Activation** | `verifyActivationCode` (`POST /api/v1/auth/activation/verify`) | `AuthRepository.verifyActivationCode` | Signed-out Guard |
+| **Activation** | `setActivationPassword` (`POST /api/v1/auth/activation/password`) | `AuthRepository.setActivationPassword` | Signed-out Guard |
+| **Admin Reg** | `registerStudentOrGuard` (`POST /api/v1/admin/accounts/registrations`) | `AdminRegistrationApi.registerStudentOrGuard` | **Admin Only** (`Idempotency-Key`) |
+| **Admin Reg** | `reclaimStudentOrGuardRegistration` (`POST /api/v1/admin/accounts/registrations/reclaim`) | `AdminRegistrationApi.reclaimStudentOrGuardRegistration` | **Admin Only** (`Idempotency-Key`) |
+| **Admin Reg** | `registerFacultyOrStaff` (`POST /api/v1/admin/accounts/registrations/employee`) | `AdminRegistrationApi.registerFacultyOrStaff` | **Admin Only** (`Idempotency-Key`) |
+| **Admin Reg** | `reclaimFacultyOrStaffRegistration` (`POST /api/v1/admin/accounts/registrations/employee/reclaim`) | `AdminRegistrationApi.reclaimFacultyOrStaffRegistration` | **Admin Only** (`Idempotency-Key`) |
+| **Admin Help** | `reissueActivationCode` (`POST /api/v1/admin/accounts/registrations/{registration_id}/otp/reissue`) | `AdminRegistrationApi.reissueActivationCode` (`{}`) | **Admin Only** (Non-idempotent) |
+| **Admin Help** | `recoverPasswordSetup` (`POST /api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover`) | `AdminRegistrationApi.recoverPasswordSetup` (`{}`) | **Admin Only** (Non-idempotent) |
+
+### Operational & Planned Extension Endpoints (25 Endpoints)
+| Group | Method & Path | Repository / Caller | Access |
+| :--- | :--- | :--- | :--- |
+| **Dashboard** | `GET /api/v1/dashboard` | `OverviewRepository.fetchDashboardReal` | Guard / Admin |
+| **Gates** | `GET /api/v1/access-attempts` | `GateMonitoringRepository.fetchAccessAttemptsReal` | Guard / Admin |
+| **Gates** | `GET /api/v1/access-attempts/{correlation_id}` | `GateMonitoringRepository.fetchAccessAttemptByIdReal` | Guard / Admin |
+| **Gates** | `POST /api/v1/access-attempts/{correlation_id}/cancel` | `GateMonitoringRepository.cancelAccessAttemptReal` | Guard / Admin |
+| **Passages** | `POST /api/v1/passages/entries` | `GateMonitoringRepository.confirmEntryPassageReal` | Guard / Admin |
+| **Passages** | `POST /api/v1/passages/exits` | `GateMonitoringRepository.confirmExitPassageReal` | Guard / Admin |
+| **Reviews** | `GET /api/v1/guard-reviews` | `GuardReviewsRepository.fetchGuardReviewsReal` | Guard / Admin |
+| **Reviews** | `POST /api/v1/guard-reviews` | `GuardReviewsRepository.submitGuardReviewReal` | Guard / Admin |
+| **Parking** | `GET /api/v1/parking-availability` | `ParkingRepository.fetchParkingAvailabilityReal` | Guard / Admin |
+| **Parking** | `GET /api/v1/building-parking-priorities` | `ParkingRepository.fetchBuildingPrioritiesReal` | Guard / Admin |
+| **Visits** | `GET /api/v1/access-visits` | `AccessLogsRepository.fetchCampusVisitsReal` | Guard / Admin |
+| **Visits** | `GET /api/v1/access-visits/{visit_id}` | `AccessLogsRepository.fetchVisitByIdReal` | Guard / Admin |
+| **Reports** | `GET /api/v1/reports/export` *(Pending Patrick Carpio path confirmation)* | `AccessLogsRepository.exportReportReal` (`ApiClient.getBytes`) | Guard / Admin (`audit_logs` Admin Only) |
+| **Devices** | `GET /api/v1/devices` | `DeviceMonitoringRepository.fetchDevicesReal` | Guard / Admin |
+| **Audit** | `GET /api/v1/admin/audit-logs` | `AdministrationRepository.fetchAuditLogsReal` | **Admin Only** |
+| **Participants (`P01`)** | `GET /api/v1/participants` | `AdministrationRepository.fetchParticipantsReal` | **Admin Only** |
+| **Participants (`P02`)** | `GET /api/v1/participants/{user_code}` | `AdministrationRepository.fetchParticipantByCodeReal` | **Admin Only** |
+| **Participants (`P03`)** | `POST /api/v1/participants` | `AdministrationRepository.createParticipantReal` | **Admin Only** |
+| **Participants (`P04`)** | `PATCH /api/v1/participants/{user_code}` | `AdministrationRepository.patchParticipantReal` | **Admin Only** |
+| **Vehicles (`P05`)** | `POST /api/v1/participants/{user_code}/vehicles` | `AdministrationRepository.registerParticipantVehicleReal` | **Admin Only** |
+| **Vehicles (`P06`)** | `PATCH /api/v1/participants/{user_code}/vehicles/{vehicle_code}` | `AdministrationRepository.patchParticipantVehicleReal` | **Admin Only** |
+| **Onboarding** | `POST /api/v1/admin/users/register` | `AdministrationRepository.registerUserAndVehicleReal` | **Admin Only** |
+| **Biometrics** | `GET /api/v1/admin/users/{user_id}/face-enrollment` | `AdministrationRepository.fetchFaceEnrollmentReal` | **Admin Only** |
+| **Biometrics** | `POST /api/v1/admin/users/{user_id}/face-enrollment` | `AdministrationRepository.submitFaceEnrollmentReal` | **Admin Only** |
+| **Biometrics** | `DELETE /api/v1/admin/users/{user_id}/face-enrollment` | `AdministrationRepository.deleteFaceEnrollmentReal` | **Admin Only** |
+
+### Real-Time WebSocket Protocol ([`ws_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/ws_client.dart))
+- **Sanitized Handshake:** `WsRealtimeClient.buildSanitizedWsUri()` strips any accidental `token`, `access_token`, or `bearer` query parameters from `WS_BASE_URL` (`/api/v1/ws/updates`) and authenticates via an initial JSON frame (`type: "auth_handshake"`).
+- **Deduplication & Ordering:** `WsInvalidationCoordinator` deduplicates `event_id`, enforces monotonic `stream_sequence` + per-resource `resource_version`, and triggers targeted invalidation across `access_attempt`, `access_visit`, `parking_assignment`, `parking_space`, `guard_review`, and `device`.
+- **Recovery & Session Expiry:** Sequence gaps or `resync_required: true` trigger full snapshot resync; reconnects use exponential backoff (`[1, 2, 4, 8, 16]` seconds + up to `250ms`–`500ms` jitter); WS close code `1008` immediately clears `SecureSessionStore` and signs the operator out.
+
+### Architectural Invariants & Confirmed Backend Extensions Table
+| Invariant / Contract Rule | Status | Enforcement Details |
 | :--- | :---: | :--- |
-| **Invariant 1: Envelope & Timestamp Standards** | Verified | Schema v1.0.0, UUIDs, UTC wire timestamps formatted to Asia/Manila (UTC+8) via [`api_envelope.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_envelope.dart). |
-| **Invariant 2: State Separation** | Verified | Allowed decision holds space with `visit_id == null`. Only passage confirmation (`guard_attestation` or sensor) creates an active visit. |
-| **Invariant 3: Dual-State Parking** | Verified | Camera `physical_status` (`available` / `occupied` / `unknown`) tracked independently from backend `allocation_status` (`unassigned` / `held` / `assigned`). Unknown/stale bays are never counted as free. |
-| **Invariant 4: Guard Review Safety Boundary** | Verified | Approve action is disabled on hard security denials (`UNKNOWN_CREDENTIAL`, `CREDENTIAL_REVOKED`, etc.) and expired holds. `409 STALE_VERSION` enforced. |
-| **Invariant 5: Multi-Vehicle Independence (U007)** | Verified | `U007`'s vehicles `V007` and `V008` have separate histories. Competing simultaneous entry is rejected with `DUPLICATE_ACTIVE_VISIT`. |
-| **Invariant 6: Fail-Closed Role Gating** | Verified | Guards receive `403 FORBIDDEN` / `ACCESS_DENIED` on admin audit logs, manual registration, and facial enrollment endpoints. |
-| **Patrick Confirmation #1: Calibrated Cosine Similarity** | Verified | `face_similarity_score` displayed strictly as raw cosine similarity in `[-1.0, 1.0]` (e.g., `0.84 cosine similarity`), never formatted as a percentage. |
-| **Patrick Confirmation #2: Confirmed Visits Endpoint** | Verified | Visits tab powered by `GET /api/v1/access-visits` schema. |
-| **Patrick Confirmation #3: Guard Attestation Fallback** | Verified | Passage confirmation modal requires 10–500 character audit notes. |
-| **RA 10173 Biometric Data Privacy Compliance** | Verified | Upload/Webcam/Submit gated behind explicit RA 10173 consent checkbox; raw photos purged immediately after ArcFace embedding extraction; supports 1-click consent withdrawal (`DELETE`). |
+| **1. Envelope & Manila Time (`UTC+8`)** | Enforced | Strict UTC RFC 3339 wire format; UI renders in `Asia/Manila` via `ManilaTime` without mutating UTC timestamps. |
+| **2. Six-Dimension State Separation** | Enforced | Allowed gate decision holds bay with `visit_id == null`. Only physical passage confirmation creates an active visit & assigned space. |
+| **3. Dual-State Parking** | Enforced | Overhead camera `physical_status` (`available`/`occupied`/`unknown`) is independent of `allocation_status` (`unassigned`/`held`/`assigned`); unconfirmed far-end (`L11`/`R11`), informal aisle (`A1–A4`/`A1–A3`), `unknown`, or stale bays are never counted as free allocatable capacity, and informal aisle occupancy never triggers formal occupancy conflicts. |
+| **4. Guard Review Safety Boundary** | Enforced | `ErrorCatalog.hardSecurityDenialReasons` (`UNKNOWN_CREDENTIAL`, `CREDENTIAL_REVOKED`, `IDENTITY_MISMATCH`, `USER_INACTIVE`, `VEHICLE_INACTIVE`, `ACTIVE_VISIT_NOT_FOUND`, `DUPLICATE_ACTIVE_VISIT`, `GUARD_DENIED`) and expired attempts cannot be overridden. `ErrorCatalog.reviewableUncertaintyReasons`: `IDENTITY_UNCERTAIN`, `NO_COMPATIBLE_SPACE`, `OCCUPANCY_CONFLICT`, `CONFIGURATION_INVALID`, `AMBIGUOUS_VEHICLE`. |
+| **5. Multi-Vehicle Independence (`U007`)** | Enforced | `U007`'s vehicles `V007` and `V008` remain distinct records; simultaneous entry of a second vehicle triggers `DUPLICATE_ACTIVE_VISIT`. |
+| **6. Fail-Closed Role Gating** | Enforced | Guard accounts cannot access admin UI (`RoleRestrictedPanel`) or admin API routes (`403 FORBIDDEN` / `ACCESS_DENIED`). |
+| **Patrick Extension #1 (Cosine Similarity)** | Enforced | Extended attempt telemetry (`plate_text`, `ocr_confidence`, `detection_confidence`, `rfid_uid`, `face_recognition_status`, `face_similarity_score` shown strictly in `[-1.0, 1.0]`). |
+| **Patrick Extension #2 (Confirmed Visits)** | Enforced | Visits tab backed by `GET /api/v1/access-visits`. |
+| **Patrick Extension #3 (`guard_attestation`)** | Enforced | Passage confirmation fallback requires 10–500 character audit notes. |
+| **RA 10173 Biometric Data Privacy** | Enforced | Mandatory consent checkbox gates upload/webcam/submit; local raw photo bytes cleared immediately post-submission; supports embedding revocation (`DELETE`). |
 
 ---
 
-## 5. What Remains To Be Done (Roadmap & Next Steps)
+## 5. Runtime Configuration, Production Defaults & Developer Test Mode
 
-1. **Live FastAPI Backend Integration (`DATA_SOURCE=real`):**
-   - Connect the app to Patrick Carpio's live FastAPI backend once deployed on the campus LAN.
-   - Run via:
-     ```powershell
-     flutter run -d windows --dart-define=DATA_SOURCE=real --dart-define=API_BASE_URL=http://127.0.0.1:8000 --dart-define=WS_BASE_URL=ws://127.0.0.1:8000/api/v1/ws/updates
-     ```
-2. **Hardware Sensor & Edge Producer Validation:**
-   - Field-test live edge telemetry from:
-     - Entrance / Exit gate barriers (relay controllers).
-     - ESP32 RC522 RFID reader at the motorcycle lanes.
-     - Overhead IP camera feeds (Lot A YOLOv8 plate recognition & ArcFace inference).
-3. **Student Mobile Application Collaboration:**
-   - Coordinate with the team working on the student-facing Android app for shared credentials, pass issuance, and destination routing sync.
-4. **Continuous Maintenance:**
-   - Keep this document updated after each milestone or major architectural modification.
+### Production-First Compile Defaults ([`app_config.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/config/app_config.dart), [`config/local.example.json`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/config/local.example.json))
+- `APP_ENV`: `'production'`
+- `DATA_SOURCE`: `'real'`
+- `ROSTER_MODE`: `'class_demo'` (`RosterMode.classDemo` CoE 4102 names vs. `RosterMode.contractSynthetic` `Synthetic Student 001–007` / `DEMO001–008`)
+- `API_BASE_URL`: `'https://API_URL_PLACEHOLDER.local:8000'` *(replace with Patrick's live FastAPI LAN/Tunnel URL)*
+- `WS_BASE_URL`: `'wss://API_URL_PLACEHOLDER.local:8000/api/v1/ws/updates'`
+- `REQUEST_TIMEOUT_MS`: `5000`
+- `DISPLAY_TIMEZONE`: `'Asia/Manila'`
+
+### Standard CLI Commands
+```powershell
+# Add Flutter to session PATH if needed
+$env:Path = "C:\Users\emman\scoop\apps\flutter\current\bin;$env:Path"
+
+# Run connected to local FastAPI LAN server (demo.example.json uses http://127.0.0.1:8000)
+flutter run -d windows --dart-define-from-file=config/demo.example.json
+
+# Run with explicit FastAPI URL overrides
+flutter run -d windows --dart-define=DATA_SOURCE=real --dart-define=API_BASE_URL=http://127.0.0.1:8000 --dart-define=WS_BASE_URL=ws://127.0.0.1:8000/api/v1/ws/updates
+
+# Static analysis & automated tests
+flutter analyze
+flutter test
+
+# Regenerate official SENTRY brand icons & .ico frames
+flutter test test/generate_brand_assets_test.dart
+
+# Build Windows x64 release executable
+flutter build windows --release
+```
+
+### Hidden Developer Test Mode *(Internal Dev Reference — NEVER expose hints in UI)*
+- **Production Cleanliness Guarantee:** In `DATA_SOURCE=real`, there are zero `DEV`/`MOCK` badges, zero quick-fill persona chips, zero prefilled `U001–U007` cards, zero synthetic metrics, and zero simulator buttons. Signing out resets `devModeUnlockedProvider = false` and restores `DATA_SOURCE=real`.
+- **3 Hidden Unlock Mechanisms:**
+  1. **Backdoor Credentials on Login:** Username `emman.dev@sentry.internal` / Password `SENTRY-DEV-4102!` (logs directly in as Administrator `Emmanuel Tamboong` in `DataSourceMode.mock`).
+  2. **Secret Logo Tap Gesture:** Tap `SentryInteractiveLogo` 5 times within 2 seconds on `LoginScreen`.
+  3. **Global Hotkey:** Press `Ctrl+Shift+Alt+D` on `LoginScreen` or `DesktopShell`.
+- **Mock Fixtures ([`synthetic_fixtures.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/shared/fixtures/synthetic_fixtures.dart)) & Simulator ([`demo_controls_sheet.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/demo_controls_sheet.dart)):**
+  - **Mock Accounts:** Guard `guard01@sentry.test` / Admin `admin01@sentry.test` (password `sentry2026`).
+  - **Fixtures:** 7 Participants (`U001–U007`), 8 Vehicles (`V001–V008`), 7 Buildings (`CET`, `REGISTRAR`, `STEERHUB`, `FITNESS CENTER`, `CEAFA`, `CICS`, `RGR`), 92 Mapped Slots across Lots B1–B5 (75 formal + 8 overflow = 83 allocatable, 2 unconfirmed, 7 informal aisle; B4 pending), 7 Producers (`D01–D07`).
+  - **9 Built-in Demo Scenarios:** `T01` (Car allowed), `T04` (Motorcycle allowed), `T02` (Wrong driver / identity mismatch), `T03` (Unknown plate), `T06` (Revoked RFID), `T07` (Second car duplicate visit), `T13` (Blurry plate/face -> Reviews), `T16` (30s hold timeout), `T20` (Car exit).
 
 ---
 
-## 6. Update Log
+## 6. Brand Identity, Design System & Platform Metadata
+
+### Colors & Surfaces ([`sentry_colors.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/theme/sentry_colors.dart), [`sentry_theme.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/theme/sentry_theme.dart))
+- **Brand Crimson:** `#C8102E` (`SentryColors.crimson`), hover `#B91C1C`, dark accent `#F87171`.
+- **Light Mode:** Background `#F8FAFC`, Card `#FFFFFF`, Subtle `#F1F5F9`, Border `p.line` (`#E2E8F0`), Text `#0F172A`, Slate `#475569`, Muted `#64748B`.
+- **OLED Dark Mode:** Background `#000000`, Card `#121215`, Subtle `#18181C`, Border `p.line` (`#24242A`), Text `#FFFFFF`, Slate `#CBD5E1`, Muted `#94A3B8` (card borders removed in dark mode via `cardBorder` depth styling).
+- **Filter Chips:** Selected state uses `#C8102E` crimson fill with `#FFFFFF` ink across both themes.
+- **Bundled Offline Typefaces (`assets/fonts/`, SIL OFL 1.1):** `SchibstedGrotesk` (400–900), `AtkinsonHyperlegibleNext` (400–800), `AtkinsonHyperlegibleMono` (400–700).
+
+### Official SENTRY Logo & Native Platform Integration
+- **Vector Widget & Painter ([`sentry_interactive_logo.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/sentry_interactive_logo.dart)):**
+  - `SentryInteractiveLogo` & `.inverted`: Cursor-tracking eyes (`tanh` falloff + `0.18` interpolation), perspective rim narrowing, and random natural eyelid blinking.
+  - `SentryLogo` & public `SentryLogoPainter`: Lightweight static rendering without continuous animation tickers.
+- **Master Assets (`assets/branding/`):** `sentry_logo.png` (1024×1024), `sentry_logo_512.png`, `sentry_logo_256.png`, `sentry_logo_card.png` (`#0B0F19` squircle), `sentry_logo_inverted.png`, `sentry_logo.svg`, and `app_icon.ico`.
+- **Windows Native Runner:**
+  - [`windows/runner/resources/app_icon.ico`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/windows/runner/resources/app_icon.ico): Multi-frame ICO containing 256, 128, 64 (PNG) + 48, 32, 24, 16 (32bpp DIB & PNG).
+  - [`windows/runner/main.cpp`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/windows/runner/main.cpp): Native Win32 window title set to `L"SENTRY · BatStateU TNEU Alangilan"`.
+  - [`windows/runner/Runner.rc`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/windows/runner/Runner.rc): `CompanyName` = `"Batangas State University - The National Engineering University"`, `FileDescription` = `"SENTRY - Smart Campus Access & Parking Management System"`, `InternalName` = `"SENTRY"`, `OriginalFilename` = `"SENTRY.exe"`, `ProductName` = `"SENTRY"`.
+- **Android & Web Targets:**
+  - Android: `android:label="SENTRY"` in [`AndroidManifest.xml`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/android/app/src/main/AndroidManifest.xml); branded squircle `ic_launcher.png` across `mdpi`/`hdpi`/`xhdpi`/`xxhdpi`/`xxxhdpi`.
+  - Web: [`web/index.html`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/web/index.html) title `"SENTRY · BatStateU TNEU Alangilan"`, [`web/manifest.json`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/web/manifest.json) theme `#C8102E` / `#0B0F19`, `web/favicon.png`, `Icon-192.png`, `Icon-512.png`, `Icon-maskable-{192,512}.png`.
+
+---
+
+## 7. Automated Test Suite, Build Packaging & Releases
+
+### Test Suite Verification (`flutter analyze` = 0 issues · `flutter test` = 55/55 passing across 9 suites + 149 contract fixtures)
+| Test File | Tests | Coverage Scope |
+| :--- | :---: | :--- |
+| [`test/phase4_contract_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/phase4_contract_test.dart) | 15 | Full 149-file Phase 4 OpenAPI contract fixture validation (`requests` 15, `invalid_requests` 15, `success` 16, `invalid_responses` 6, `errors` 96 + `fixture_index.json`), `error.code`-only routing with mutated `error.message`, single-flight refresh & zero retry grace / zero POST replay, `RegisterFormController` `Idempotency-Key` lifecycle, password policy & secret redaction, mobile-role login rejection, signed-out Guard activation/reset flows, Guard isolation & Admin receipt/reissue UI flows. |
+| [`test/api_and_admin_features_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/api_and_admin_features_test.dart) | 12 | `ApiClient` Bearer & `Idempotency-Key` injection, `401` single-attempt refresh (`TokenPairData`), `403`/`409` details parsing, `WsRealtimeClient` token stripping, Planned Manual Registration & `409` plate conflict, RA 10173 consent gate, embedding revocation, `DATA_SOURCE=real` defaults, 5x tap & backdoor unlock. |
+| [`test/contracts_and_invariants_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/contracts_and_invariants_test.dart) | 8 | Core Phases 6–12 invariants: state separation (`visit_id == null` on holds), `U007` multi-vehicle independence, role gating (`403`), offline `D05` bay staleness, WS sequence gap resync, Guard Review safety boundaries. |
+| [`test/parking_b1_b5_and_export_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/parking_b1_b5_and_export_test.dart) | 6 | Surveyed `B1–B5` model/fixture counts & unconfirmed/informal/PWD exclusions, configurable `zone_name` overrides, `computeLotSummaries()`, blueprint navigation (`B1–B5` + Bay Inspector Drawer), `LocalReportGenerator` CSV & `%PDF-1.4` binary generation, `AccessLogsRepository.exportReportReal` (`GET /api/v1/reports/export` + `403` fail-closed), and Guard vs Admin `Audit Logs` scope gating & file export UI flow. |
+| [`test/prod_cleanliness_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/prod_cleanliness_test.dart) | 4 | Verifies zero mock badges, zero prefilled credentials/plates, zero simulator controls in production `real` mode across all screens, Guard sidebar & `DesktopViewRouter` isolation (zero Admin providers), plus clean sign-out reset. |
+| [`test/widget_overflow_audit_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/widget_overflow_audit_test.dart) | 4 | Sweeps every screen, all 5 Administration sub-tabs, and modals across `1920x1080`, `1366x768`, `1280x720`, and `600x800` (mobile preview drawer) asserting zero `RenderFlex` overflow errors. |
+| [`test/spatial_ui_and_motion_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/spatial_ui_and_motion_test.dart) | 4 | Verifies floating sidebar OLED Dark toggle & collapse, Spatial Bento Overview Tactical Map + layer filters + frosted callout -> Lot `B2` navigation + charts, Parking Management floating lot tabs/zoom/legend + frosted Bay Inspector Drawer, and disconnected `DATA_SOURCE=real` clean empty chart frames (`0` fake `Peak:` badges). |
+| [`test/widget_desktop_flow_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/widget_desktop_flow_test.dart) | 1 | End-to-end authenticated desktop workstation user flow. |
+| [`test/generate_brand_assets_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/generate_brand_assets_test.dart) | 1 | Rasterizes `SentryLogoPainter` via `dart:ui`, generates all branding PNGs/SVG/Android/Web icons, builds multi-frame `app_icon.ico`, and asserts output integrity. |
+
+### Windows Release Packaging & Git Hygiene
+- **Build Artifact:** `flutter build windows --release` emits `build\windows\x64\runner\Release\campus_parking_desktop.exe`, copied/renamed as `SENTRY.exe` alongside `flutter_windows.dll`, `camera_windows_plugin.dll`, `dartjni.dll`, `file_selector_windows_plugin.dll`, and `data/` into [`SENTRY-Windows-Release/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-Release) and archived to [`SENTRY-Windows-x64.zip`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/SENTRY-Windows-x64.zip).
+- **Git Ignore Protection ([`.gitignore`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/.gitignore)):** Strictly excludes `.env`, `config/local.json`, `config/demo.json`, `.vscode/`, `build/`, `*.zip`, `*.apk`, and `*.exe`. Only `.env.example`, `config/local.example.json`, and `config/demo.example.json` templates are committed.
+
+### GitHub Releases Summary
+| Tag | Date | Assets | Notes |
+| :--- | :---: | :--- | :--- |
+| **[`v1.1.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.1.0)** *(Latest)* | 2026-11-12 | `SENTRY-Windows-x64.zip` (`17.15 MB`), `SENTRY.exe` (`89 KB`) | Official SENTRY brand logo & `.ico`/native metadata, Prompts 1–4 production defaults & cleanliness sweep, webcam capture, 0 overflows, 30/30 tests. |
+| [`v1.0.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.0.0) | 2026-11-11 | `SENTRY-Windows-x64.zip`, `SENTRY-demo-release.apk` (`50.7 MB`) | Initial desktop command console & standalone Android demo APK release. |
+
+---
+
+## 8. Engineering Pitfalls, Guardrails & Remaining Roadmap
+
+### Recorded Pitfalls & Code Guardrails *(Agent Memory)*
+1. **Sign-Out Transition Null-Check:** `_Sidebar` and `AdministrationScreen` must guard against `authState.profile == null` (returning `const SizedBox.shrink()`) because Riverpod may rebuild for one frame during `signOut()` before `SentryDesktopApp` swaps back to `LoginScreen`.
+2. **Palette Border Property:** `SentryPalette` exposes `p.line` and `p.cardBorder` — there is **no** `p.border` getter (`p.cardBorder` intentionally returns transparent in dark mode).
+3. **Top-Bar Horizontal Overflow:** Always wrap dynamic top-bar telemetry chips (`_ConnectionStatus`) in `FittedBox(fit: BoxFit.scaleDown)` so narrow desktop/tablet widths never trigger `RenderFlex` overflows.
+4. **Asset Generator Execution Context:** `test/generate_brand_assets_test.dart` uses `dart:ui` (`PictureRecorder`, `Canvas`, `ImageByteFormat`); it **must** run under `flutter test`, never standalone `dart run`.
+5. **Backdoor OpSec:** Never mention `emman.dev@sentry.internal`, `SENTRY-DEV-4102!`, the 5x logo tap gesture, or `Ctrl+Shift+Alt+D` in any visible UI widget, tooltip, label, or error banner.
+6. **Secret & Binary Hygiene:** Never create or commit `.env` or `config/local.json`, and keep `*.zip`/`*.apk`/`*.exe` ignored in Git.
+7. **Horizontal Blueprint Slot Height Budget (`_BlueprintSlotTile`):** Horizontal bays inside [`lot_blueprint_canvas.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/lot_blueprint_canvas.dart) use `height: 44`, `vertical: 2` padding, compact `11.5`/`10.0` text with `.copyWith(height: 1.05)` (`SentryTheme.mono` does not expose a `height` named parameter), and `Flexible` row wrappers so narrow viewports never hit fractional bottom `RenderFlex` overflows.
+8. **`flutter_animate` `Future.delayed` Timer Leak in Single-Pump Tests:** `flutter_animate` `4.5.0` unconditionally schedules `Future.delayed(widget.delay, ...)` in `_AnimateState._restart()`, tripping `!timersPending` assertions when tests navigate away with single-frame `tester.pump()`. Use [`BentoReveal`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/motion/motion.dart) (`SingleTickerProviderStateMixin` + `AnimationController` + staggered `Interval`) for zero-Timer Bento entrances.
+9. **Hoist Floating Tabs Above `SmoothSwitcher` & Wrap Compact Card Headers:** Keep `Key('parking_tab_*')` outside `SmoothSwitcher` (`380ms`) so rapid tab switches never duplicate keyed buttons (`Bad state: Too many elements`); keep `_ReviewCaseCard` header badges wrapped in `Wrap` (`guard_reviews_screen.dart`) to avoid `5.4px` horizontal overflows inside `1280x720` floating-rail widths.
+
+### Remaining Roadmap & Next Steps
+1. **Live FastAPI Backend Integration (`DATA_SOURCE=real`):** Replace `API_URL_PLACEHOLDER` with Patrick Carpio's live campus LAN/Tunnel URL; verify live auth, WebSocket updates, passage confirmations, RA 10173 biometric enrollment, confirm `GET /api/v1/reports/export` (`// TODO(API)`), and finalize Lot `B4` CET Building survey schematic once physical bay markings are available.
+2. **Hardware Sensor & Edge Producer Validation (`D01`–`D06`):** Field-test entrance/exit barrier relays, ESP32 RC522 motorcycle RFID readers, Gate 1/2 YOLOv8 LPR + ArcFace cameras, and the overhead lot occupancy mast.
+3. **Student Mobile App Coordination:** Align pass issuance, student credentials, and destination lot routing sync with the Android Mobile Application team.
+4. **Continuous Documentation:** Keep this file updated per the Living Memory Protocol whenever changes are made.
+
+---
+
+## 9. Chronological Project Progress & Audit Log
 
 - **2026-11-11:** Initial creation and execution of Phases 1 through 13.
 - **2026-11-11:** UX and accessibility overhaul; replaced cluttered screens with progressive disclosure cards; added offline bundled fonts (`Schibsted Grotesk`, `Atkinson Hyperlegible`).
 - **2026-11-12:** Built standalone mobile Android APK (`50.7 MB`); adapted shell for mobile screens (bottom navigation + drawer).
-- **2026-11-12:** Initialized Git, pushed clean code to [`thisisemman-22/Sentry-Windows`](https://github.com/thisisemman-22/Sentry-Windows).
-- **2026-11-12:** Compiled native Windows release binary (`SENTRY.exe`) and published GitHub Release `v1.0.0` with Windows ZIP and Android APK assets.
-- **2026-11-12:** Created this master tracking document ([`PROJECT_PROGRESS.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/PROJECT_PROGRESS.md)) in `\SENTRY`.
+- **2026-11-12:** Initialized Git, pushed clean code to [`thisisemman-22/Sentry-Windows`](https://github.com/thisisemman-22/Sentry-Windows) (`ddc2093`).
+- **2026-11-12:** Compiled native Windows release binary (`SENTRY.exe`) and published GitHub Release [`v1.0.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.0.0) with Windows ZIP and Android APK assets.
+- **2026-11-12:** Created master tracking document [`PROJECT_PROGRESS.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/PROJECT_PROGRESS.md) in `\SENTRY`.
 - **2026-11-12:** Executed [`antigravity_prompt_1_api_and_admin_features.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_1_api_and_admin_features.md): wired full `DATA_SOURCE=real` HTTP & WebSocket client architecture (`ApiClient`, `WsRealtimeClient`, feature repositories), added Administrator **Manual User & Vehicle Registration** (`POST /api/v1/admin/users/register`) and **RA 10173 Facial Recognition Enrollment** (`GET/POST/DELETE /api/v1/admin/users/{user_id}/face-enrollment`), and verified `flutter analyze` (`0 issues`) + `flutter test` (`14/14 passing`).
 - **2026-11-12:** Executed [`antigravity_prompt_1b_logic_and_prod_audit.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_1b_logic_and_prod_audit.md) (Prompt 1.5 Logic, State, Security & Production-Readiness Audit): added startup fail-closed configuration error screen for `DATA_SOURCE=real`, eliminated synthetic mock data initialization in `real` mode, enforced 30-second space hold & 20-second decision expiration blocking passage confirmation with automatic bay release, added WebSocket exponential reconnection backoff (`1s, 2s, 4s, 8s, 16s` capped with jitter), fixed empty-collection `.first` crashes, added dialog controller disposal & in-flight submission guards, and verified `flutter analyze` (`0 issues`) + `flutter test` (`18/18 passing`).
 - **2026-11-12:** Executed [`antigravity_prompt_2_ui_polish_and_overflow_audit.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_2_ui_polish_and_overflow_audit.md) (Prompt 2 UI Polish, Motion Tuning, Prominent Interactive Logo & Zero-Overflow Responsiveness Audit): added 3-section labeled sidebar navigation (`OPERATIONS`, `RECORDS & HARDWARE`, `SYSTEM`), `Ctrl+K` command palette modal, compact 56px top bar with tabular Manila clock, 220ms view transitions, prominent interactive inverted logo with animated sonar rings on Login, sidebar header, and empty gate idle state, eliminated all RenderFlex overflow errors across `1920x1080`, `1366x768`, `1280x720`, and `600x800` (mobile preview drawer), and verified `flutter analyze` (`0 issues`) + `flutter test` (`22/22 passing`).
 - **2026-11-12:** Executed [`antigravity_prompt_3_prod_default_and_fixes.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_3_prod_default_and_fixes.md) (Prompt 3 Production-First Default, Secret Developer Backdoor, Real Webcam Capture & UI Fixes): switched default config to `DATA_SOURCE=real` (`APP_ENV=production`, `https://API_URL_PLACEHOLDER.local:8000`), removed mock clutter from production views, implemented secret developer backdoor credentials (`emman.dev@sentry.internal` / `SENTRY-DEV-4102!`), 5x logo tap, and `Ctrl+Shift+Alt+D` shortcut, integrated real Windows webcam capture (`camera` / `camera_windows`), fixed KPI/pill/chip/sidebar visuals, rebuilt release `SENTRY.exe`, and verified `flutter analyze` (`0 issues`) + `flutter test` (`25/25 passing`).
-- **2026-11-12:** Executed [`antigravity_prompt_4_demo_trace_sweep.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_4_demo_trace_sweep.md) (Prompt 4 Codebase-Wide Demo Trace Sweep & Production Cleanliness Audit):
-  - **Login Screen:** Input fields start completely blank (`''`); persona quick-fill chips hidden in production; zero text or hint leaks revealing backdoor credentials, gestures, or shortcuts.
-  - **Top Bar & Shell:** No `DEV` or `MOCK` badge in real mode; demo controls sheet trigger removed; top bar connection pill renders live WebSocket status (`Connected` / `Reconnecting` / `Offline`) with fitted scale protection; clock displayed calmly with tabular figures.
-  - **Overview Dashboard:** Zero hardcoded initial KPIs (`3`, `5 in · 2 out`, `4`, `26 / 32`); displays `—` and `'Awaiting backend connection'` until real FastAPI dashboard telemetry loads; calm empty states for parking lots (`'Awaiting parking lot telemetry'`) and activity feed (`'No recent gate activity'`).
-  - **Live Gates:** Zero prefilled lanes (`UKQ247`, `DAL4266`, etc.); all 4 lanes initialize to `'Idle — Waiting for vehicle'`; center hero displays gate idle prompt; `'Simulate encounter'` button strictly gated behind developer test mode.
-  - **Guard Reviews:** Empty queue defaults to clean `'No pending guard reviews'` state; `'simulate_stale_version_button'` / `'Test version conflict'` strictly gated behind developer test mode.
-  - **Parking Management:** Empty bay state renders `'Awaiting lot telemetry'`; `'Cycle camera state'` button strictly gated behind developer test mode.
-  - **Access Logs:** Visits tab shows `'No campus visits recorded'`; gate attempts tab shows `'No gate attempts recorded'`; participant lookup initializes without hardcoded `U007` selection and shows `'No registered drivers loaded'` when disconnected.
-  - **Device Monitoring:** Displays clean empty state `'No site devices loaded'`; device simulator buttons (`Online`, `Degraded`, `Offline`) strictly gated behind developer test mode.
-  - **Administration & Face Enrollment:** Initial enrollment selection starts unassigned (`null`) with zero prefilled `U001`/`U002` cards; biometric enrollment displays `'No registered users available'`; camera capture fails closed with `"No webcam detected — use Upload Face Images to select photos from disk"`; Guard role 403 test button (`'Test Calling Endpoint as Guard'`) hidden in production mode; test session expiry button hidden.
-  - **Sign-Out Reset:** Signing out immediately resets `devModeUnlocked = false` and resets `sentryScenarioProvider` to clean `DATA_SOURCE=real`.
-  - **Verification:** Built new comprehensive `test/prod_cleanliness_test.dart` (4/4 passed), verified `flutter analyze` (`0 issues found`), full `flutter test` (100% pass across all 5 test files), rebuilt release `SENTRY.exe`, and updated `SENTRY-Windows-x64.zip`.
-- **2026-11-12:** Executed Official SENTRY Brand Logo & Icon Suite Implementation:
-  - **Logo Geometry & Painter:** Extracted and formalized the mathematical BatStateU Crimson Shield (`#C8102E`) and car geometry with headlights/eyes from `sentry_interactive_logo.dart` into reusable `SentryLogoPainter` and `SentryLogo` static widget.
-  - **Asset Suite Generation:** Created `test/generate_brand_assets_test.dart` leveraging Flutter's native rasterizer to generate master high-res PNGs (`sentry_logo.png` 1024x1024, `sentry_logo_512.png`, `sentry_logo_256.png`, `sentry_logo_inverted.png`, `sentry_logo_card.png`) and vector `sentry_logo.svg` in `assets/branding/`.
-  - **Windows Runner Icon:** Generated multi-frame native Windows icon `windows/runner/resources/app_icon.ico` (containing 256, 128, 64, 48, 32, 24, 16 resolutions in 32bpp DIB and PNG formats) replacing the default Flutter bird.
-  - **Android Launcher Icons:** Replaced default Flutter icons in `android/app/src/main/res/mipmap-{hdpi,mdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png` with branded squircle tiles.
-  - **Web Favicon & PWA Icons:** Updated `web/favicon.png`, `web/icons/Icon-192.png`, `web/icons/Icon-512.png`, `web/icons/Icon-maskable-192.png`, and `web/icons/Icon-maskable-512.png`.
-  - **Metadata & Window Titles:** Updated `windows/runner/main.cpp` native window title (`"SENTRY · BatStateU TNEU Alangilan"`), `windows/runner/Runner.rc` Win32 metadata strings (`"Batangas State University - The National Engineering University"`, `"SENTRY - Smart Campus Access & Parking Management System"`, `"SENTRY.exe"`), `android/app/src/main/AndroidManifest.xml` (`android:label="SENTRY"`), and `web/manifest.json` / `web/index.html`.
-  - **In-App Integration:** Added "About SENTRY" modal in sidebar footer menu displaying the interactive shield logo, version, and BatStateU institutional attribution.
-  - **Verification & Rebuild:** `flutter analyze` (`0 issues`), `flutter test` (`31/31 passing`), rebuilt native Windows release binary `campus_parking_desktop.exe` / `SENTRY.exe`, repackaged `SENTRY-Windows-x64.zip`, committed and pushed to GitHub [`thisisemman-22/Sentry-Windows`](https://github.com/thisisemman-22/Sentry-Windows), and created GitHub Release `v1.1.0`.
+- **2026-11-12:** Executed [`antigravity_prompt_4_demo_trace_sweep.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_4_demo_trace_sweep.md) (Prompt 4 Codebase-Wide Demo Trace Sweep & Production Cleanliness Audit): swept Login Screen, Top Bar & Shell, Overview, Live Gates, Guard Reviews, Parking Management, Access Logs, Device Monitoring, Administration/Face Enrollment, and Sign-Out Reset (`devModeUnlocked = false`) to guarantee zero mock leaks in `real` mode; built `test/prod_cleanliness_test.dart` (4/4 passed); verified `flutter analyze` (`0 issues`) + `flutter test` (100% pass); rebuilt release `SENTRY.exe` and updated `SENTRY-Windows-x64.zip`.
+- **2026-11-12:** Executed Official SENTRY Brand Logo & Icon Suite Implementation: formalized `SentryLogoPainter` & `SentryLogo`, generated `assets/branding/` assets and vector SVG via `test/generate_brand_assets_test.dart`, replaced Windows `app_icon.ico` (256..16 multi-resolution), Android `mipmap-*/ic_launcher.png`, Web favicons/PWA icons, updated native metadata (`main.cpp`, `Runner.rc`, `AndroidManifest.xml`, `web/manifest.json`, `web/index.html`), added **About SENTRY** modal in `desktop_shell.dart`, verified `flutter analyze` (`0 issues`) + full `flutter test`, rebuilt `SENTRY.exe` and `SENTRY-Windows-x64.zip` (`17.15 MB`), pushed commit `cb35298` to GitHub, and published GitHub Release [`v1.1.0`](https://github.com/thisisemman-22/Sentry-Windows/releases/tag/v1.1.0).
+- **2026-11-24:** Restructured `PROJECT_PROGRESS.md` into the comprehensive **Master Application Reference, Feature Summary, Agent Memory & Change Audit Log**: added Quick-Reference Workspace Card, complete Tech Stack & File Map, Riverpod DI graph, full Global Shell & 8-View Feature Inventory, 28-endpoint Backend HTTP + WebSocket reference, Configuration & Hidden Dev Mode documentation, Design System & Branding inventory, Automated Test & Release tables, Engineering Pitfalls/Guardrails memory section, corrected header metadata to match verified repository state (`v1.1.0`, `17.15 MB` ZIP, `30 tests across 6 files`), and mirrored byte-for-byte to [`campus_parking_desktop/PROJECT_PROGRESS.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/PROJECT_PROGRESS.md).
+- **2026-11-24:** Executed [`antigravity_prompt_a_phase4_openapi_contract.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_a_phase4_openapi_contract.md) (**Phase 4 OpenAPI 3.1.0 Contract Alignment**, revised handoff package `1.0.0-draft` / wire `contract_version: "1.0.0"`): imported all **149** official contract fixtures into [`test/fixtures/contract/`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/fixtures/contract); added strict parser & `Phase4ApiFailure` sealed code-only error dispatcher ([`phase4_contract.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/phase4_contract.dart)); upgraded [`api_envelope.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_envelope.dart), [`api_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_client.dart) (single-flight `/auth/refresh` with `0` retry grace, `8s` timeout, zero mutation auto-replay, `Retry-After` / `X-Request-ID`), [`auth_models.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/shared/models/auth_models.dart) (`ProfileData` 7-field allowlist, mobile-role detection, zero-trim passwords, secret redaction in `toString()`), and [`auth_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/data/auth_repository.dart) (10 auth/account ops); added signed-out Security Guard [`guard_activation_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/guard_activation_dialog.dart), [`guard_password_reset_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/guard_password_reset_dialog.dart), and [`change_password_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/authentication/presentation/change_password_dialog.dart); enforced strict Guard role isolation across [`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart), [`router.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/router.dart), and [`providers.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/providers.dart); implemented Admin Phase 4 DTOs/API/Idempotency controller/Receipt/Activation Help ([`phase4_admin_dtos.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/data/dto/phase4_admin_dtos.dart), [`admin_registration_api.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/data/admin_registration_api.dart), [`register_form_controller.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/state/register_form_controller.dart), [`receipt_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/receipt_dialog.dart), [`activation_help_page.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/activation_help_page.dart)) alongside clearly labelled Planned Extension tabs in [`administration_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/administration/presentation/administration_screen.dart); authored [`test/phase4_contract_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/phase4_contract_test.dart) (`15` tests) and updated impacted suites (`45/45` tests passing, `flutter analyze` `0` issues).
+- **2026-11-24:** Executed [`antigravity_prompt_b_parking_lots_b1_b5_and_export.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_b_parking_lots_b1_b5_and_export.md) (**Surveyed Campus Parking Lots `B1–B5` & CSV/PDF Report Export**): replaced legacy `Lots A–D` with real BatStateU Alangilan parking plans in [`parking_models.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/shared/models/parking_models.dart) (`SpaceSlotCategory`, `ParkingLotZoneMeta`, `kCampusParkingLots`, `SpaceDto`, `LotSummaryDto`, `BuildingPriorityRow`), [`synthetic_fixtures.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/shared/fixtures/synthetic_fixtures.dart) (`92` mapped fixture slots, `D05` -> `B1`, 7-building × 5-lot priority matrix), [`scenario_simulator.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/shared/fixtures/scenario_simulator.dart), [`providers.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/providers.dart) (`selectedParkingLotProvider`), [`lot_blueprint_canvas.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/lot_blueprint_canvas.dart) (`LotBlueprintCanvas`, `InteractiveViewer` zoom/pan, `_DiagonalHatchPainter`, `_DashedBorderPainter`, zero-overflow `_BlueprintSlotTile`), and [`parking_management_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/parking_management_screen.dart) (slide-out Bay Inspector Drawer via `showDetailsSheet` + `B1–B5` Building routing matrix); implemented binary export (`ApiClient.getBytes` in [`api_client.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/network/api_client.dart), `exportReportReal` in [`access_logs_repository.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/data/access_logs_repository.dart) targeting `GET /api/v1/reports/export`), [`report_export_dialog.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/report_export_dialog.dart) (`ExportReportMenuButton`, `showReportExportDialog`, `LocalReportGenerator` for `RFC-4180 CSV` & `%PDF-1.4`, role-gated `Audit Logs` scope, `file_selector` native save dialog), wired into [`overview_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_screen.dart) (`Lots B1 to B5` + Export button) and [`access_logs_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/access_logs/presentation/access_logs_screen.dart); authored [`test/parking_b1_b5_and_export_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/parking_b1_b5_and_export_test.dart) (`6` tests) and updated existing suites; verified `flutter analyze --no-pub` (`0` issues) and `flutter test --no-pub --reporter expanded` (`51/51` passing across 8 suites, zero `RenderFlex` overflows across `1920x1080`, `1366x768`, `1280x720`, and `600x800`).
+- **2026-11-24:** Executed [`antigravity_prompt_c_spatial_ui_and_motion_overhaul.md`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/antigravity_prompt_c_spatial_ui_and_motion_overhaul.md) (**Spatial Command-Center Aesthetic, Floating Controls & Fluid Motion Overhaul** — refined to the full-bleed Vinora OS spatial layout while preserving SENTRY BatStateU Crimson, Pure OLED Dark, and Light Mode tokens): added zero-Timer `BentoReveal` (`220ms` / `40ms` stagger, `Curves.easeOutCubic`) and updated `AnimatedCount` (`350ms` + `FontFeature.tabularFigures()`) in [`motion.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/motion/motion.dart); added `FrostedSurface` (`BackdropFilter` sigma <= `10.0`), `frosted: true` mode on `showDetailsSheet`, and adaptive `ScreenScaffold` padding in [`sentry_ui.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/core/widgets/ui/sentry_ui.dart); upgraded [`desktop_shell.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/app/desktop_shell.dart) with floating rounded translucent sidebar rail (`borderRadius: 20`, crimson pill tint navigation, bottom rail theme & collapse toggles); created [`spatial_glass.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/spatial_glass.dart) (`SpatialGlass`, `GlassTile`, `SoftChip`, `BigFigure`, `GlassIconButton`), [`campus_aerial_painter.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/campus_aerial_painter.dart) (`CampusAerialPainter` + `CampusMapLayout`), [`campus_tactical_map.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/campus_tactical_map.dart), and [`overview_charts.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_charts.dart), and refactored [`overview_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/overview/presentation/overview_screen.dart) into a full-bleed aerial canvas with smoked-glass overlays (stem-pin `B1–B5` markers, horizontal `map_layer_*` pills, animated zoom + `_MiniBayPainter` frosted callout, `CampusMixDonutCard` concentric 270° rings, `GateActivityBarChartCard` full-height capsule bar tracks + crimson peak glow, 2×2 KPI tiles with `MiniSparkline`, `LollipopStemMicroChart`, and ticked `CapacityRadialGauge`, `_ActiveGateEncounterCard` 4-stage verification pills, clean activity rows, and fail-closed `DATA_SOURCE=real` empty states); upgraded [`lot_blueprint_canvas.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/lot_blueprint_canvas.dart) and [`parking_management_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/parking_management/presentation/parking_management_screen.dart) with `_ArchitecturalGridPainter`, `SpatialGlass` floating lot tabs hoisted outside `SmoothSwitcher`, floating legend & zoom controls (`-`, `Reset`, `+`), selection ring highlight, and frosted Bay Inspector Drawer; converted `_ReviewCaseCard` header to `Wrap` in [`guard_reviews_screen.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/lib/features/guard_reviews/presentation/guard_reviews_screen.dart); authored [`test/spatial_ui_and_motion_test.dart`](file:///C:/Users/emman/OneDrive/Documents/SENTRY/campus_parking_desktop/test/spatial_ui_and_motion_test.dart) (`4` tests); verified `flutter analyze --no-pub` (`0` issues), `flutter test --no-pub --reporter expanded` (`55/55` passing across 9 suites, zero overflows at `1920x1080`, `1366x768`, `1280x720`, `600x800`), and `flutter build windows --release` (`campus_parking_desktop.exe`, `89,088` bytes).

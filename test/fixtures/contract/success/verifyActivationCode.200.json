@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "data": {
+    "setup_grant": "EXAMPLE-OPAQUE-SETUP-GRANT",
+    "grant_type": "password_setup",
+    "expires_at": "2026-11-21T06:05:00Z"
+  },
+  "error": null,
+  "meta": {
+    "request_id": "90000000-0000-4000-8000-000000000013",
+    "timestamp": "2026-11-21T06:00:00Z",
+    "contract_version": "1.0.0",
+    "idempotent_replay": false
+  }
+}

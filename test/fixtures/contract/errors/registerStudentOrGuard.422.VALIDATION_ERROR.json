@@ -1,0 +1,15 @@
+{
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed.",
+    "details": []
+  },
+  "meta": {
+    "request_id": "90000000-0000-4000-8000-000000001044",
+    "timestamp": "2026-11-21T02:00:00Z",
+    "contract_version": "1.0.0",
+    "idempotent_replay": false
+  }
+}

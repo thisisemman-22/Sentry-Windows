@@ -10,6 +10,7 @@ import '../core/theme/sentry_theme.dart';
 import '../core/widgets/sentry_interactive_logo.dart';
 import '../core/widgets/ui/sentry_ui.dart';
 import '../shared/models/auth_models.dart';
+import '../features/authentication/presentation/change_password_dialog.dart';
 import 'demo_controls_sheet.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -69,6 +70,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final p = SentryPalette.of(context);
     final activeTab = ref.watch(selectedDesktopTabProvider);
     final collapsed = ref.watch(sidebarCollapsedProvider);
+    final isAdmin =
+        ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
+    final visibleTabs = DesktopNavTab.values
+        .where((t) => isAdmin || t != DesktopNavTab.administration)
+        .toList();
 
     // Surface simulator / action feedback as a toast instead of a banner strip.
     ref.listen(sentryScenarioProvider.select((s) => s.lastActionBanner),
@@ -86,11 +92,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     });
 
     final shortcuts = <ShortcutActivator, VoidCallback>{
-      for (var i = 0; i < DesktopNavTab.values.length; i++)
+      for (var i = 0; i < visibleTabs.length; i++)
         SingleActivator(
           LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i),
           control: true,
-        ): () => _go(DesktopNavTab.values[i]),
+        ): () => _go(visibleTabs[i]),
       const SingleActivator(LogicalKeyboardKey.keyB, control: true): () =>
           ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
       const SingleActivator(LogicalKeyboardKey.keyL,
@@ -149,7 +155,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                   child: SafeArea(
                     child: _Sidebar(
                       collapsed: false,
+                      floating: false,
                       activeTab: activeTab,
+                      onToggleTheme: _toggleTheme,
                       onSelect: (tab) {
                         Navigator.of(context).maybePop();
                         _go(tab);
@@ -181,7 +189,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                 if (!isMobile)
                   _Sidebar(
                     collapsed: collapsed,
+                    floating: true,
                     activeTab: activeTab,
+                    onToggleTheme: _toggleTheme,
                     onSelect: _go,
                   ),
                 Expanded(
@@ -211,13 +221,17 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
 
 class _Sidebar extends ConsumerWidget {
   final bool collapsed;
+  final bool floating;
   final DesktopNavTab activeTab;
   final ValueChanged<DesktopNavTab> onSelect;
+  final VoidCallback onToggleTheme;
 
   const _Sidebar({
     required this.collapsed,
+    required this.floating,
     required this.activeTab,
     required this.onSelect,
+    required this.onToggleTheme,
   });
 
   @override
@@ -226,19 +240,27 @@ class _Sidebar extends ConsumerWidget {
     final kpis = ref.watch(
         sentryScenarioProvider.select((s) => s.computeDashboardKpis()));
     final authState = ref.watch(authControllerProvider);
+    final themeMode = ref.watch(themeModeProvider);
     final profile = authState.profile;
     if (profile == null) return const SizedBox.shrink();
-    final width = collapsed ? 88.0 : 256.0;
+    final width = collapsed ? 84.0 : 252.0;
+    final railColor =
+        floating && p.isDark ? const Color(0xEB121215) : p.card;
 
     return AnimatedContainer(
+      key: floating ? const Key('floating_sidebar_rail') : null,
       duration: SentryMotion.of(context, SentryMotion.medium),
       curve: SentryMotion.emphasized,
+      margin: floating ? const EdgeInsets.fromLTRB(12, 12, 0, 12) : EdgeInsets.zero,
       width: width,
       decoration: BoxDecoration(
-        color: p.card,
-        border: Border(right: BorderSide(color: p.line)),
+        color: railColor,
+        borderRadius: BorderRadius.circular(floating ? 20 : 0),
+        border: floating ? Border.all(color: p.line, width: 1) : null,
+        boxShadow: floating ? p.shadowSoft : null,
       ),
-      child: ClipRect(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(floating ? 19 : 0),
         child: OverflowBox(
           alignment: Alignment.topLeft,
           minWidth: width,
@@ -248,10 +270,10 @@ class _Sidebar extends ConsumerWidget {
             children: [
               // Brand
               Padding(
-                padding: EdgeInsets.fromLTRB(collapsed ? 24 : 22, 22, 14, 22),
+                padding: EdgeInsets.fromLTRB(collapsed ? 24 : 20, 20, 14, 18),
                 child: Row(
                   children: [
-                    const SentryInteractiveLogo(size: 34),
+                    const SentryInteractiveLogo(size: 32),
                     if (!collapsed) ...[
                       const SizedBox(width: 12),
                       Expanded(
@@ -296,9 +318,13 @@ class _Sidebar extends ConsumerWidget {
               Expanded(
                 child: FocusTraversalGroup(
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     children: [
-                      for (final tab in DesktopNavTab.values) ...[
+                      for (final tab in DesktopNavTab.values.where(
+                        (t) =>
+                            profile.role.isAdmin ||
+                            t != DesktopNavTab.administration,
+                      )) ...[
                         if (_sectionLabelFor(tab) != null)
                           _NavSectionLabel(
                             label: _sectionLabelFor(tab)!,
@@ -309,8 +335,7 @@ class _Sidebar extends ConsumerWidget {
                           tab: tab,
                           selected: tab == activeTab,
                           collapsed: collapsed,
-                          locked: tab == DesktopNavTab.administration &&
-                              !profile.role.isAdmin,
+                          locked: false,
                           badge: switch (tab) {
                             DesktopNavTab.liveGateMonitoring =>
                               kpis.activeHoldsAwaitingPassageCount,
@@ -329,27 +354,145 @@ class _Sidebar extends ConsumerWidget {
                 ),
               ),
 
-              // Collapse toggle
+              // Bottom rail utilities: Theme toggle + collapse toggle
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Align(
-                  alignment:
-                      collapsed ? Alignment.center : Alignment.centerLeft,
-                  child: IconButton(
-                    tooltip: collapsed
-                        ? 'Expand sidebar (Ctrl+B)'
-                        : 'Collapse sidebar (Ctrl+B)',
-                    onPressed: () => ref
-                        .read(sidebarCollapsedProvider.notifier)
-                        .state = !collapsed,
-                    icon: AnimatedRotation(
-                      turns: collapsed ? 0.5 : 0,
-                      duration: SentryMotion.of(context, SentryMotion.medium),
-                      curve: SentryMotion.emphasized,
-                      child: const Icon(Icons.keyboard_double_arrow_left_rounded),
-                    ),
-                  ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: collapsed ? 10 : 12,
+                  vertical: 4,
                 ),
+                child: collapsed
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            key: floating
+                                ? const Key('sidebar_theme_toggle')
+                                : null,
+                            tooltip: themeMode == ThemeMode.dark
+                                ? 'Light mode (Ctrl+Shift+L)'
+                                : 'OLED Dark mode (Ctrl+Shift+L)',
+                            onPressed: onToggleTheme,
+                            icon: Icon(
+                              themeMode == ThemeMode.dark
+                                  ? Icons.light_mode_outlined
+                                  : Icons.dark_mode_outlined,
+                              size: 19,
+                              color: p.slate,
+                            ),
+                          ),
+                          if (floating)
+                            IconButton(
+                              key: const Key('sidebar_collapse_toggle'),
+                              tooltip: 'Expand sidebar (Ctrl+B)',
+                              onPressed: () => ref
+                                  .read(sidebarCollapsedProvider.notifier)
+                                  .state = !collapsed,
+                              icon: AnimatedRotation(
+                                turns: 0.5,
+                                duration: SentryMotion.of(
+                                    context, SentryMotion.medium),
+                                curve: SentryMotion.emphasized,
+                                child: const Icon(
+                                    Icons.keyboard_double_arrow_left_rounded),
+                              ),
+                            ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: Tooltip(
+                              message: themeMode == ThemeMode.dark
+                                  ? 'Switch to Light mode (Ctrl+Shift+L)'
+                                  : 'Switch to OLED Dark mode (Ctrl+Shift+L)',
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    key: floating
+                                        ? const Key('sidebar_theme_toggle')
+                                        : null,
+                                    onTap: onToggleTheme,
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: AnimatedContainer(
+                                      duration: SentryMotion.of(
+                                          context,
+                                          const Duration(milliseconds: 180)),
+                                      curve: Curves.easeOutCubic,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: p.subtle,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: p.line),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AnimatedSwitcher(
+                                            duration: SentryMotion.of(
+                                                context, SentryMotion.medium),
+                                            transitionBuilder: (c, a) =>
+                                                RotationTransition(
+                                              turns: Tween(
+                                                      begin: 0.75, end: 1.0)
+                                                  .animate(a),
+                                              child: FadeTransition(
+                                                  opacity: a, child: c),
+                                            ),
+                                            child: Icon(
+                                              themeMode == ThemeMode.dark
+                                                  ? Icons.light_mode_outlined
+                                                  : Icons.dark_mode_outlined,
+                                              key: ValueKey(themeMode),
+                                              size: 17,
+                                              color: p.slate,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              themeMode == ThemeMode.dark
+                                                  ? 'OLED Dark'
+                                                  : 'Light mode',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: p.text,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (floating) ...[
+                            const SizedBox(width: 6),
+                            IconButton(
+                              key: const Key('sidebar_collapse_toggle'),
+                              tooltip: 'Collapse sidebar (Ctrl+B)',
+                              onPressed: () => ref
+                                  .read(sidebarCollapsedProvider.notifier)
+                                  .state = !collapsed,
+                              icon: AnimatedRotation(
+                                turns: 0,
+                                duration: SentryMotion.of(
+                                    context, SentryMotion.medium),
+                                curve: SentryMotion.emphasized,
+                                child: const Icon(
+                                    Icons.keyboard_double_arrow_left_rounded),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
               ),
 
               // Operator
@@ -418,8 +561,11 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     final sys = ref.watch(sentryScenarioProvider);
+    final isAdmin =
+        ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
     final q = _q.trim().toUpperCase();
     final views = DesktopNavTab.values
+        .where((t) => isAdmin || t != DesktopNavTab.administration)
         .where((t) => q.isEmpty || t.title.toUpperCase().contains(q))
         .toList();
     final people = q.isEmpty
@@ -544,17 +690,22 @@ class _NavItemState extends State<_NavItem> {
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     final sel = widget.selected;
-    final fg = sel ? Colors.white : (_hover ? p.text : p.slate);
+    final activeCrimson =
+        p.isDark ? SentryColors.crimsonDarkAccent : SentryColors.crimson;
+    final iconColor = sel ? activeCrimson : (_hover ? p.text : p.slate);
+    final textColor = sel ? p.text : (_hover ? p.text : p.slate);
     final shortcut = 'Ctrl+${widget.tab.index + 1}';
     final t = ToneColors.of(context, widget.badgeTone);
 
     final badge = widget.badge > 0
         ? AnimatedContainer(
-            duration: SentryMotion.of(context, SentryMotion.short),
+            duration: SentryMotion.of(
+                context, const Duration(milliseconds: 180)),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             constraints: const BoxConstraints(minWidth: 24),
             decoration: BoxDecoration(
-              color: sel ? Colors.white : t.solid,
+              color: sel ? SentryColors.crimson : t.solid,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -563,7 +714,7 @@ class _NavItemState extends State<_NavItem> {
               style: SentryTheme.mono(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: sel ? SentryColors.crimson : Colors.white,
+                color: Colors.white,
               ),
             ),
           )
@@ -576,6 +727,7 @@ class _NavItemState extends State<_NavItem> {
           '${widget.tab.title}${widget.badge > 0 ? ', ${widget.badge} need attention' : ''}${widget.locked ? ', administrators only' : ''}',
       excludeSemantics: true,
       child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
         child: Material(
@@ -585,25 +737,23 @@ class _NavItemState extends State<_NavItem> {
             borderRadius: BorderRadius.circular(14),
             focusColor: p.crimson.withValues(alpha: 0.14),
             child: AnimatedContainer(
-              duration: SentryMotion.of(context, SentryMotion.short),
-              curve: SentryMotion.emphasized,
-              height: 48,
+              duration: SentryMotion.of(
+                  context, const Duration(milliseconds: 180)),
+              curve: Curves.easeOutCubic,
+              height: 46,
               padding: EdgeInsets.symmetric(
                   horizontal: widget.collapsed ? 0 : 14),
               decoration: BoxDecoration(
                 color: sel
                     ? SentryColors.crimson
+                        .withValues(alpha: p.isDark ? 0.22 : 0.14)
                     : (_hover ? p.subtle : Colors.transparent),
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: sel
-                    ? [
-                        BoxShadow(
-                          color: SentryColors.crimson.withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                          spreadRadius: -8,
-                        ),
-                      ]
+                border: sel
+                    ? Border.all(
+                        color: SentryColors.crimson
+                            .withValues(alpha: p.isDark ? 0.42 : 0.30),
+                      )
                     : null,
               ),
               child: widget.collapsed
@@ -613,7 +763,7 @@ class _NavItemState extends State<_NavItem> {
                         Icon(
                             sel ? widget.tab.selectedIcon : widget.tab.icon,
                             size: 22,
-                            color: fg),
+                            color: iconColor),
                         if (widget.badge > 0)
                           Positioned(
                             top: 8,
@@ -622,7 +772,7 @@ class _NavItemState extends State<_NavItem> {
                               width: 9,
                               height: 9,
                               decoration: BoxDecoration(
-                                color: sel ? Colors.white : t.solid,
+                                color: sel ? SentryColors.crimson : t.solid,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: p.card, width: 1.5),
                               ),
@@ -635,7 +785,7 @@ class _NavItemState extends State<_NavItem> {
                         Icon(
                             sel ? widget.tab.selectedIcon : widget.tab.icon,
                             size: 21,
-                            color: fg),
+                            color: iconColor),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Text(
@@ -646,13 +796,14 @@ class _NavItemState extends State<_NavItem> {
                               fontSize: 14.5,
                               fontWeight:
                                   sel ? FontWeight.w700 : FontWeight.w600,
-                              color: fg,
+                              color: textColor,
                             ),
                           ),
                         ),
                         if (widget.locked)
                           Icon(Icons.lock_outline_rounded,
-                              size: 16, color: fg.withValues(alpha: 0.7)),
+                              size: 16,
+                              color: textColor.withValues(alpha: 0.7)),
                         if (badge != null) badge,
                       ],
                     ),
@@ -797,6 +948,18 @@ class _OperatorChip extends ConsumerWidget {
           padding: const WidgetStatePropertyAll(EdgeInsets.all(6)),
         ),
         menuChildren: [
+          MenuItemButton(
+            key: const Key('menu_own_profile'),
+            leadingIcon: const Icon(Icons.badge_outlined),
+            onPressed: () => showOwnProfileDialog(context, ref),
+            child: const Text('My profile'),
+          ),
+          MenuItemButton(
+            key: const Key('menu_change_password'),
+            leadingIcon: const Icon(Icons.password_rounded),
+            onPressed: () => showChangePasswordDialog(context),
+            child: const Text('Change password'),
+          ),
           MenuItemButton(
             leadingIcon: const Icon(Icons.info_outline_rounded),
             onPressed: () => _showAboutSentry(context),
@@ -988,27 +1151,29 @@ class _TopBar extends ConsumerWidget {
               ),
               child: const _ManilaClock(),
             ),
-          const SizedBox(width: 4),
-          IconButton(
-            key: const Key('sidebar_theme_toggle'),
-            tooltip: themeMode == ThemeMode.dark
-                ? 'Light mode (Ctrl+Shift+L)'
-                : 'Dark mode (Ctrl+Shift+L)',
-            onPressed: onToggleTheme,
-            icon: AnimatedSwitcher(
-              duration: SentryMotion.of(context, SentryMotion.medium),
-              transitionBuilder: (c, a) => RotationTransition(
-                turns: Tween(begin: 0.75, end: 1.0).animate(a),
-                child: FadeTransition(opacity: a, child: c),
-              ),
-              child: Icon(
-                themeMode == ThemeMode.dark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
-                key: ValueKey(themeMode),
+          if (isMobile) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              key: const Key('sidebar_theme_toggle'),
+              tooltip: themeMode == ThemeMode.dark
+                  ? 'Light mode (Ctrl+Shift+L)'
+                  : 'OLED Dark mode (Ctrl+Shift+L)',
+              onPressed: onToggleTheme,
+              icon: AnimatedSwitcher(
+                duration: SentryMotion.of(context, SentryMotion.medium),
+                transitionBuilder: (c, a) => RotationTransition(
+                  turns: Tween(begin: 0.75, end: 1.0).animate(a),
+                  child: FadeTransition(opacity: a, child: c),
+                ),
+                child: Icon(
+                  themeMode == ThemeMode.dark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  key: ValueKey(themeMode),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

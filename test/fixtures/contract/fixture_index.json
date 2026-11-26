@@ -1,0 +1,2193 @@
+{
+  "status": "DRAFT - PREPARATION ONLY. NOT FROZEN. NOT AUTHORIZED FOR DISTRIBUTION. SOURCE/MOCK ONLY.",
+  "contract": {
+    "file": "../../01_SHARED_API_CONTRACT/openapi.yaml",
+    "sha256": "41313b7bb88a7a0569e39d2fc29230c9080eb77cf63bdd82b4aba3b5ff4bace1",
+    "info_version": "1.0.0-draft",
+    "wire_contract_version": "1.0.0"
+  },
+  "validation": "Positive fixtures validated against the canonical OpenAPI schemas (formats on) with the repository's bounded custom contract validator and against the backend's source Pydantic models. Negative fixtures confirmed rejected. Offline only; no runtime call.",
+  "fixtures": [
+    {
+      "file": "success/login.200.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/login.request.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/login.unknown-field.request.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/login.401.AUTHENTICATION_FAILED.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/login.422.VALIDATION_ERROR.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/login.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/refreshTokens.200.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/refreshTokens.request.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/refreshTokens.unknown-field.request.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/refreshTokens.401.AUTHENTICATION_FAILED.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/refreshTokens.422.VALIDATION_ERROR.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/refreshTokens.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "refreshTokens",
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/logoutCurrentSession.200.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/logoutCurrentSession.request.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/logoutCurrentSession.unknown-field.request.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/logoutCurrentSession.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/logoutCurrentSession.422.VALIDATION_ERROR.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/logoutCurrentSession.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "logoutCurrentSession",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/getOwnProfile.200.json",
+      "operationId": "getOwnProfile",
+      "method": "GET",
+      "path": "/api/v1/me",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/getOwnProfile.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "getOwnProfile",
+      "method": "GET",
+      "path": "/api/v1/me",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/getOwnProfile.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "getOwnProfile",
+      "method": "GET",
+      "path": "/api/v1/me",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/changePassword.200.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/changePassword.request.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/changePassword.unknown-field.request.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/changePassword.400.CURRENT_PASSWORD_INVALID.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/changePassword.400.PASSWORD_POLICY_REJECTED.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/changePassword.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/changePassword.409.PASSWORD_CHANGE_CONFLICT.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/changePassword.422.VALIDATION_ERROR.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/changePassword.429.PASSWORD_CHANGE_LIMITED.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/changePassword.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "changePassword",
+      "method": "POST",
+      "path": "/api/v1/auth/password/change",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/requestPasswordReset.202.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/requestPasswordReset.request.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/requestPasswordReset.unknown-field.request.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/requestPasswordReset.422.VALIDATION_ERROR.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/requestPasswordReset.429.PASSWORD_RESET_LIMITED.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/requestPasswordReset.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "requestPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/request",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/verifyPasswordReset.200.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/verifyPasswordReset.request.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/verifyPasswordReset.unknown-field.request.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/verifyPasswordReset.400.PASSWORD_RESET_REJECTED.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/verifyPasswordReset.422.VALIDATION_ERROR.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/verifyPasswordReset.429.PASSWORD_RESET_LIMITED.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/verifyPasswordReset.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "verifyPasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/verify",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/completePasswordReset.200.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/completePasswordReset.request.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/completePasswordReset.unknown-field.request.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/completePasswordReset.400.PASSWORD_RESET_REJECTED.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/completePasswordReset.400.PASSWORD_POLICY_REJECTED.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/completePasswordReset.422.VALIDATION_ERROR.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/completePasswordReset.429.PASSWORD_RESET_LIMITED.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/completePasswordReset.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "completePasswordReset",
+      "method": "POST",
+      "path": "/api/v1/auth/password-reset/complete",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/verifyActivationCode.200.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/verifyActivationCode.request.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/verifyActivationCode.unknown-field.request.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/verifyActivationCode.400.ACTIVATION_REJECTED.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/verifyActivationCode.422.VALIDATION_ERROR.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/verifyActivationCode.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "verifyActivationCode",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/verify",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/setActivationPassword.200.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": 200,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/setActivationPassword.request.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/setActivationPassword.unknown-field.request.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/setActivationPassword.400.ACTIVATION_REJECTED.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/setActivationPassword.400.PASSWORD_POLICY_REJECTED.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/setActivationPassword.422.VALIDATION_ERROR.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/setActivationPassword.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "setActivationPassword",
+      "method": "POST",
+      "path": "/api/v1/auth/activation/password",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/registerStudentOrGuard.202.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/registerStudentOrGuard.request.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {
+        "Idempotency-Key": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "file": "invalid_requests/registerStudentOrGuard.unknown-field.request.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/registerStudentOrGuard.400.REGISTRATION_INVALID.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.400.IDEMPOTENCY_KEY_INVALID.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.403.ACCESS_DENIED.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.409.REGISTRATION_CONFLICT.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.409.IDEMPOTENCY_CONFLICT.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.422.VALIDATION_ERROR.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerStudentOrGuard.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "registerStudentOrGuard",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/reissueActivationCode.202.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/reissueActivationCode.request.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/reissueActivationCode.unknown-field.request.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/reissueActivationCode.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.403.ACCESS_DENIED.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.404.REGISTRATION_NOT_FOUND.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 404,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.409.REISSUE_NOT_ALLOWED.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.409.DELIVERY_IN_PROGRESS.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.409.REISSUE_EXHAUSTED.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.422.VALIDATION_ERROR.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reissueActivationCode.429.REISSUE_LIMITED.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/reissueActivationCode.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "reissueActivationCode",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/otp/reissue",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/recoverPasswordSetup.202.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/recoverPasswordSetup.request.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {}
+    },
+    {
+      "file": "invalid_requests/recoverPasswordSetup.unknown-field.request.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/recoverPasswordSetup.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.403.ACCESS_DENIED.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.404.REGISTRATION_NOT_FOUND.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 404,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.409.RECOVERY_NOT_ALLOWED.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.409.DELIVERY_IN_PROGRESS.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.409.REISSUE_EXHAUSTED.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.422.VALIDATION_ERROR.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/recoverPasswordSetup.429.REISSUE_LIMITED.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/recoverPasswordSetup.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "recoverPasswordSetup",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/{registration_id}/password-setup/recover",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/reclaimStudentOrGuardRegistration.202.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/reclaimStudentOrGuardRegistration.request.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {
+        "Idempotency-Key": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "file": "invalid_requests/reclaimStudentOrGuardRegistration.unknown-field.request.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.400.RECLAIM_INVALID.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.400.IDEMPOTENCY_KEY_INVALID.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.403.ACCESS_DENIED.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.409.IDEMPOTENCY_CONFLICT.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.409.REGISTRATION_CONFLICT.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.409.RECLAIM_NOT_ELIGIBLE.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.409.RECLAIM_LIMIT_REACHED.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.422.VALIDATION_ERROR.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.429.RECLAIM_LIMITED.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/reclaimStudentOrGuardRegistration.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "reclaimStudentOrGuardRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/reclaim",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/registerFacultyOrStaff.202.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/registerFacultyOrStaff.request.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {
+        "Idempotency-Key": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "file": "invalid_requests/registerFacultyOrStaff.unknown-field.request.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.400.REGISTRATION_INVALID.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.400.IDEMPOTENCY_KEY_INVALID.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.403.ACCESS_DENIED.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.409.REGISTRATION_CONFLICT.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.409.IDEMPOTENCY_CONFLICT.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.422.VALIDATION_ERROR.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/registerFacultyOrStaff.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "registerFacultyOrStaff",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "success/reclaimFacultyOrStaffRegistration.202.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 202,
+      "kind": "success-response",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "requests/reclaimFacultyOrStaffRegistration.request.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": null,
+      "kind": "request-body",
+      "provenance": "contract-example",
+      "classification": "source-verified",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "request_headers_illustrative": {
+        "Idempotency-Key": "00000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "file": "invalid_requests/reclaimFacultyOrStaffRegistration.unknown-field.request.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": null,
+      "kind": "invalid-request-body",
+      "expected_response": "422 VALIDATION_ERROR",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true,
+      "pydantic_rejects": true
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.400.RECLAIM_INVALID.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.400.IDEMPOTENCY_KEY_INVALID.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 400,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.401.AUTHENTICATION_REQUIRED.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 401,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": "Bearer"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.403.ACCESS_DENIED.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 403,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.409.IDEMPOTENCY_CONFLICT.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.409.REGISTRATION_CONFLICT.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message illustrative; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.409.RECLAIM_NOT_ELIGIBLE.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.409.RECLAIM_LIMIT_REACHED.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 409,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.422.VALIDATION_ERROR.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 422,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.429.RECLAIM_LIMITED.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 429,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message source; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": 60
+      },
+      "headers_illustrative": [
+        "Retry-After"
+      ]
+    },
+    {
+      "file": "errors/reclaimFacultyOrStaffRegistration.503.SERVICE_UNAVAILABLE.json",
+      "operationId": "reclaimFacultyOrStaffRegistration",
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/registrations/employee/reclaim",
+      "status": 503,
+      "kind": "error-response",
+      "provenance": "derived: code from x-sentry-error-codes; message contract-example; request_id/timestamp synthetic",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/common.404.RESOURCE_NOT_FOUND.json",
+      "operationId": null,
+      "method": null,
+      "path": null,
+      "status": 404,
+      "kind": "error-response",
+      "provenance": "derived: x-sentry-common-errors; message source",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/common.405.METHOD_NOT_ALLOWED.json",
+      "operationId": null,
+      "method": null,
+      "path": null,
+      "status": 405,
+      "kind": "error-response",
+      "provenance": "derived: x-sentry-common-errors; message source",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "errors/common.500.INTERNAL_ERROR.json",
+      "operationId": null,
+      "method": null,
+      "path": null,
+      "status": 500,
+      "kind": "error-response",
+      "provenance": "derived: x-sentry-common-errors; message source",
+      "classification": "illustrative",
+      "openapi_schema_valid": true,
+      "pydantic_valid": true,
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "file": "invalid_responses/missing-meta.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_PasswordResetAcceptedData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    },
+    {
+      "file": "invalid_responses/top-level-errors-field.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_PasswordResetAcceptedData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    },
+    {
+      "file": "invalid_responses/wrong-contract-version.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_PasswordResetAcceptedData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    },
+    {
+      "file": "invalid_responses/ok-true-with-error.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_PasswordResetAcceptedData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    },
+    {
+      "file": "invalid_responses/unknown-delivery-label.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_RegistrationReceiptData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    },
+    {
+      "file": "invalid_responses/unknown-extra-data-field.json",
+      "operationId": null,
+      "status": null,
+      "kind": "invalid-response",
+      "schema": "Envelope_RegistrationReceiptData",
+      "provenance": "derived",
+      "classification": "illustrative (negative)",
+      "openapi_schema_rejects": true
+    }
+  ]
+}

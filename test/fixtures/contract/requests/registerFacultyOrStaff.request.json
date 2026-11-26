@@ -1,0 +1,12 @@
+{
+  "role": "faculty",
+  "identifier": "EXAMPLE-EMP-0001",
+  "identity_kind": "employee",
+  "identity_issuer": "EXAMPLE-UNIVERSITY-HR",
+  "email": "example.faculty@example.invalid",
+  "full_name": "Example Faculty",
+  "building_id": "20000000-0000-4000-8000-000000000001",
+  "attestation": {
+    "reference": "EXAMPLE-ATTESTATION-0001"
+  }
+}

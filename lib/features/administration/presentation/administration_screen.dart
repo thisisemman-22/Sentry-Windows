@@ -12,10 +12,14 @@ import '../../../core/network/api_envelope.dart';
 import '../../../core/theme/sentry_colors.dart';
 import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/plate_badge.dart';
-import '../../../core/widgets/role_restricted_panel.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/models/auth_models.dart';
 import '../../../shared/models/participant_models.dart';
+import '../../authentication/presentation/change_password_dialog.dart';
+import '../data/dto/phase4_admin_dtos.dart';
+import '../state/register_form_controller.dart';
+import 'activation_help_page.dart';
+import 'receipt_dialog.dart';
 
 /// In-memory staged face frame prior to ArcFace embedding extraction.
 /// Discarded immediately from memory once enrollment is submitted.
@@ -48,9 +52,11 @@ class AdministrationScreen extends ConsumerStatefulWidget {
 }
 
 class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
-  // 0 = Drivers & vehicles, 1 = Manual registration, 2 = Facial enrollment, 3 = Audit log
+  // 0 = Account registration (Phase 4), 1 = Activation help (Phase 4),
+  // 2 = Facial enrollment (Planned), 3 = Drivers & vehicles (Planned), 4 = Audit log (Planned)
   int _adminSubTab = 0;
-  String? _guardForbiddenTestResult;
+  bool _showLegacyPrototypeRegForm = false;
+  String? _lastPhase4ReceiptId;
 
   // --- Feature 1: Manual User & Vehicle Registration State ---
   final _fullNameCtrl = TextEditingController();
@@ -550,32 +556,39 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
     if (session == null) return const SizedBox.shrink();
     final profile = session.profile;
     final isAdmin = profile.role.isAdmin;
+    // Strict Guard isolation: Guards never render AdministrationScreen or
+    // construct any Admin-only registration/recovery providers.
+    if (!isAdmin) return const SizedBox.shrink();
 
     return ScreenScaffold(
       children: [
         PageIntro(
           title: 'Administration',
           subtitle:
-              'Operator profile, user & vehicle registration, RA 10173 facial enrollment, and the audit trail.',
+              'Phase 4 account registration & OTP activation help, plus planned biometric, fleet, and audit modules.',
           actions: [
-            if (isAdmin)
-              SegmentTabs(
-                keyPrefix: 'admin_subtab',
-                labels: [
-                  'Drivers & vehicles (${sysState.participantDirectory.length})',
-                  'Manual registration',
-                  'Facial enrollment',
-                  'Audit log (${sysState.auditLogs.length})',
-                ],
-                icons: const [
-                  Icons.directions_car_outlined,
-                  Icons.person_add_alt_1_outlined,
-                  Icons.face_retouching_natural_outlined,
-                  Icons.policy_outlined,
-                ],
-                selected: _adminSubTab,
-                onChanged: (i) => setState(() => _adminSubTab = i),
-              ),
+            SegmentTabs(
+              keyPrefix: 'admin_subtab',
+              labels: [
+                'Account registration',
+                'Activation help',
+                'Facial enrollment (Planned)',
+                'Drivers & vehicles (Planned · ${sysState.participantDirectory.length})',
+                'Audit log (Planned · ${sysState.auditLogs.length})',
+              ],
+              icons: const [
+                Icons.how_to_reg_outlined,
+                Icons.support_agent_rounded,
+                Icons.face_retouching_natural_outlined,
+                Icons.directions_car_outlined,
+                Icons.policy_outlined,
+              ],
+              selected: _adminSubTab,
+              onChanged: (i) => setState(() {
+                _adminSubTab = i;
+                if (i != 3) _showLegacyPrototypeRegForm = false;
+              }),
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -697,6 +710,12 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
                         label: const Text('Test session expiry'),
                       ),
                     ],
+                    OutlinedButton.icon(
+                      key: const Key('admin_change_password_button'),
+                      onPressed: () => showChangePasswordDialog(context),
+                      icon: const Icon(Icons.password_rounded, size: 18),
+                      label: const Text('Change password'),
+                    ),
                     FilledButton.icon(
                       key: const Key('admin_logout_button'),
                       onPressed: () {
@@ -714,42 +733,53 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
 
         const SizedBox(height: 20),
 
-        // 2. Role-Gated Sections
-        if (!isAdmin)
-          Reveal(
-            index: 2,
-            child: RoleRestrictedPanel(
-              title: 'Administrator access required',
-              endpointPath:
-                  'GET /api/v1/admin/audit-logs · POST /api/v1/admin/users/register · /api/v1/admin/users/{user_id}/face-enrollment',
-              description:
-                  'You are signed in as ${profile.fullName} (Guard). Registering users/vehicles, enrolling biometric templates, and reading the system audit log require an Administrator account.',
-              lastSimulatedError: ref.watch(appConfigProvider).isMock
-                  ? _guardForbiddenTestResult
-                  : null,
-              onSimulateForbiddenCall: ref.watch(appConfigProvider).isMock
-                  ? () {
-                      final res = ref
-                          .read(sentryScenarioProvider.notifier)
-                          .fetchAuditLogsForRole(UserRole.guard);
-                      setState(() {
-                        _guardForbiddenTestResult =
-                            '${res.error?.code}: ${res.error?.message}';
-                      });
-                    }
-                  : null,
-            ),
-          )
-        else
-          SmoothSwitcher(
-            switchKey: _adminSubTab,
-            child: switch (_adminSubTab) {
-              0 => _buildParticipantsCard(context, p, profile),
-              1 => _buildManualRegistrationCard(context, p, profile),
-              2 => _buildFacialEnrollmentCard(context, p, profile),
-              _ => _buildAuditLogsCard(context, p),
-            },
-          ),
+        // 2. Administrator Phase 4 & Planned Sections
+        SmoothSwitcher(
+          switchKey: _adminSubTab,
+          child: switch (_adminSubTab) {
+            0 => _Phase4AccountRegistrationCard(
+                onReceiptRecorded: (regId) {
+                  setState(() => _lastPhase4ReceiptId = regId);
+                },
+                onOpenActivationHelp: (regId) {
+                  setState(() {
+                    _lastPhase4ReceiptId = regId;
+                    _adminSubTab = 1;
+                  });
+                },
+              ),
+            1 => ActivationHelpPage(
+                initialRegistrationId: _lastPhase4ReceiptId,
+                onSwitchToReclaim: () {
+                  ref
+                      .read(registerFormControllerProvider.notifier)
+                      .setFlow(AdminRegistrationFlow.reclaimStudentOrGuard);
+                  setState(() => _adminSubTab = 0);
+                },
+              ),
+            2 => _buildFacialEnrollmentCard(context, p, profile),
+            3 => _showLegacyPrototypeRegForm
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => setState(
+                            () => _showLegacyPrototypeRegForm = false,
+                          ),
+                          icon: const Icon(Icons.arrow_back_rounded, size: 17),
+                          label: const Text('Back to Drivers & vehicles'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildManualRegistrationCard(context, p, profile),
+                    ],
+                  )
+                : _buildParticipantsCard(context, p, profile),
+            _ => _buildAuditLogsCard(context, p),
+          },
+        ),
       ],
     );
   }
@@ -766,17 +796,26 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SectionHeader(
-            title: 'Registered drivers & vehicles',
+            title: 'Registered drivers & vehicles (Planned)',
             subtitle:
-                'Add vehicles, check facial enrollment status, or toggle authorization for campus participants.',
+                'Planned post-Phase 4 extension: manage vehicles, check facial enrollment status, or toggle participant authorization.',
             hint:
                 'Participant directory endpoints (/api/v1/participants/...) with admission_evaluated: false.',
             trailing: FilledButton.icon(
               key: const Key('open_manual_registration_tab_button'),
-              onPressed: () => setState(() => _adminSubTab = 1),
+              onPressed: () =>
+                  setState(() => _showLegacyPrototypeRegForm = true),
               icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-              label: const Text('Register new user'),
+              label: const Text('Legacy manual user & vehicle form'),
             ),
+          ),
+          const SizedBox(height: 14),
+          const Callout(
+            tone: PillTone.info,
+            icon: Icons.extension_outlined,
+            title: 'Planned Extension — Outside Phase 4 OpenAPI Scope',
+            message:
+                'Official Phase 4 account provisioning lives under Account registration & Activation help. Drivers & vehicles remains here for planned P01–P06 fleet and enrollment workflows.',
           ),
           const SizedBox(height: 20),
           if (sysState.participantDirectory.isEmpty)
@@ -1331,11 +1370,25 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
 
     if (sysState.participantDirectory.isEmpty) {
       return const SentryCard(
-        child: EmptyState(
-          icon: Icons.face_retouching_natural_outlined,
-          title: 'No registered users available',
-          message:
-              'Register a user in Manual Registration first or sync the participant directory.',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Callout(
+              tone: PillTone.info,
+              icon: Icons.extension_outlined,
+              title: 'Planned Extension — Outside Phase 4 OpenAPI Scope',
+              message:
+                  'Biometric RA 10173 facial enrollment endpoints are scheduled for a subsequent backend release.',
+            ),
+            SizedBox(height: 16),
+            EmptyState(
+              icon: Icons.face_retouching_natural_outlined,
+              title: 'No registered users available',
+              message:
+                  'Register a user in Drivers & vehicles (Planned) first or sync the participant directory.',
+            ),
+          ],
         ),
       );
     }
@@ -1813,13 +1866,21 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SectionHeader(
-            title: 'System audit log',
+            title: 'System audit log (Planned)',
             subtitle:
                 'Chronological record of guard confirmations, reviews, user registrations, and biometric enrollments.',
             trailing: StatusPill(
-              label: '${sysState.auditLogs.length} entries',
-              tone: PillTone.ok,
+              label: '${sysState.auditLogs.length} entries · Planned',
+              tone: PillTone.info,
             ),
+          ),
+          const SizedBox(height: 14),
+          const Callout(
+            tone: PillTone.info,
+            icon: Icons.extension_outlined,
+            title: 'Planned Extension — Outside Phase 4 OpenAPI Scope',
+            message:
+                'Global audit log feed is retained for the telemetry/operations roadmap alongside Phase 4 request_id tracing.',
           ),
           const SizedBox(height: 18),
           for (var i = 0; i < sysState.auditLogs.length; i++) ...[
@@ -2064,6 +2125,502 @@ class _WindowsWebcamCaptureDialogState
           label: Text(_isCapturing ? 'Capturing…' : 'Capture Frame'),
         ),
       ],
+    );
+  }
+}
+
+/// Phase 4 OpenAPI Administrator account registration & reclaim workflow
+/// (operations `registerStudentOrGuard`, `reclaimStudentOrGuardRegistration`,
+/// `registerFacultyOrStaff`, `reclaimFacultyOrStaffRegistration`).
+///
+/// Instantiated ONLY when the active operator is an Administrator.
+class _Phase4AccountRegistrationCard extends ConsumerStatefulWidget {
+  final ValueChanged<String> onReceiptRecorded;
+  final ValueChanged<String> onOpenActivationHelp;
+
+  const _Phase4AccountRegistrationCard({
+    required this.onReceiptRecorded,
+    required this.onOpenActivationHelp,
+  });
+
+  @override
+  ConsumerState<_Phase4AccountRegistrationCard> createState() =>
+      _Phase4AccountRegistrationCardState();
+}
+
+class _Phase4AccountRegistrationCardState
+    extends ConsumerState<_Phase4AccountRegistrationCard> {
+  late final TextEditingController _identifierCtrl;
+  late final TextEditingController _issuerCtrl;
+  late final TextEditingController _emailCtrl;
+  late final TextEditingController _fullNameCtrl;
+  late final TextEditingController _buildingCtrl;
+  late final TextEditingController _attestationCtrl;
+  bool _obscureAttestation = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = ref.read(registerFormControllerProvider);
+    _identifierCtrl = TextEditingController(text: initial.identifier);
+    _issuerCtrl = TextEditingController(text: initial.identityIssuer);
+    _emailCtrl = TextEditingController(text: initial.email);
+    _fullNameCtrl = TextEditingController(text: initial.fullName);
+    _buildingCtrl = TextEditingController(text: initial.buildingId);
+    _attestationCtrl =
+        TextEditingController(text: initial.attestationReference);
+  }
+
+  @override
+  void dispose() {
+    _identifierCtrl.dispose();
+    _issuerCtrl.dispose();
+    _emailCtrl.dispose();
+    _fullNameCtrl.dispose();
+    _buildingCtrl.dispose();
+    _attestationCtrl.dispose();
+    super.dispose();
+  }
+
+  void _syncControllersOnReset(RegisterFormState next) {
+    if (next.attestationReference.isEmpty &&
+        _attestationCtrl.text.isNotEmpty) {
+      _attestationCtrl.clear();
+    }
+    final isEmptyAll = next.identifier.isEmpty &&
+        next.identityIssuer.isEmpty &&
+        next.email.isEmpty &&
+        next.fullName.isEmpty &&
+        next.buildingId.isEmpty &&
+        next.attestationReference.isEmpty &&
+        next.pendingIdempotencyKey == null &&
+        next.lastReceipt == null;
+    if (isEmptyAll) {
+      if (_identifierCtrl.text.isNotEmpty) _identifierCtrl.clear();
+      if (_issuerCtrl.text.isNotEmpty) _issuerCtrl.clear();
+      if (_emailCtrl.text.isNotEmpty) _emailCtrl.clear();
+      if (_fullNameCtrl.text.isNotEmpty) _fullNameCtrl.clear();
+      if (_buildingCtrl.text.isNotEmpty) _buildingCtrl.clear();
+      if (_attestationCtrl.text.isNotEmpty) _attestationCtrl.clear();
+    }
+  }
+
+  Future<void> _submit({bool manualRetry = false}) async {
+    final ctrl = ref.read(registerFormControllerProvider.notifier);
+    final receipt = manualRetry
+        ? await ctrl.retrySameSubmission()
+        : await ctrl.submitNewIntent();
+    if (!mounted || receipt == null) return;
+    _attestationCtrl.clear();
+    widget.onReceiptRecorded(receipt.registrationId);
+    await showRegistrationReceiptDialog(
+      context,
+      receipt: receipt,
+      onOpenActivationHelp: () =>
+          widget.onOpenActivationHelp(receipt.registrationId),
+    );
+  }
+
+  String _flowLabel(AdminRegistrationFlow flow) => switch (flow) {
+        AdminRegistrationFlow.registerStudentOrGuard =>
+          'Register Student / Guard',
+        AdminRegistrationFlow.reclaimStudentOrGuard =>
+          'Reclaim Student / Guard',
+        AdminRegistrationFlow.registerFacultyOrStaff =>
+          'Register Faculty / Staff',
+        AdminRegistrationFlow.reclaimFacultyOrStaff =>
+          'Reclaim Faculty / Staff',
+      };
+
+  Key _flowKey(AdminRegistrationFlow flow) => switch (flow) {
+        AdminRegistrationFlow.registerStudentOrGuard =>
+          const Key('p4_flow_register_student_guard'),
+        AdminRegistrationFlow.reclaimStudentOrGuard =>
+          const Key('p4_flow_reclaim_student_guard'),
+        AdminRegistrationFlow.registerFacultyOrStaff =>
+          const Key('p4_flow_register_employee'),
+        AdminRegistrationFlow.reclaimFacultyOrStaff =>
+          const Key('p4_flow_reclaim_employee'),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<RegisterFormState>(registerFormControllerProvider, (_, next) {
+      _syncControllersOnReset(next);
+    });
+
+    final form = ref.watch(registerFormControllerProvider);
+    final ctrl = ref.read(registerFormControllerProvider.notifier);
+    final blocked = (form.retryAfterRemaining ?? 0) > 0;
+    final allowedKinds = IdentityKind.allowedFor(form.studentGuardRole);
+
+    return SentryCard(
+      padding: const EdgeInsets.all(26),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SectionHeader(
+            title: 'Phase 4 account registration & reclaim',
+            subtitle:
+                'Provision new Student, Security Guard, Faculty, or Staff accounts with per-intent Idempotency-Key protection.',
+            hint:
+                'Submits canonical Phase 4 JSON requests (additionalProperties: false) and returns an opaque registration_id receipt.',
+          ),
+          const SizedBox(height: 18),
+
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final flow in AdminRegistrationFlow.values)
+                ChoiceChip(
+                  key: _flowKey(flow),
+                  label: Text(_flowLabel(flow)),
+                  selected: form.flow == flow,
+                  onSelected: form.isSubmitting
+                      ? null
+                      : (_) => ctrl.setFlow(flow),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (form.isEmployeeFlow) ...[
+            const Callout(
+              tone: PillTone.warn,
+              icon: Icons.verified_user_outlined,
+              title: 'Administrator attestation fails closed (D-05)',
+              message:
+                  'attestation.reference is NEVER echoed by the server and cannot be retrieved later. Faculty & Staff must activate and manage passwords via SENTRY Mobile — not the desktop shell.',
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (form.errorMessage != null) ...[
+            Callout(
+              tone: PillTone.err,
+              icon: Icons.error_outline_rounded,
+              title: form.requestId != null
+                  ? '${form.errorCode ?? 'Error'} · Request ID: ${form.requestId}'
+                  : (form.errorCode ?? 'Error'),
+              message: form.errorMessage!,
+              action: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (form.canRetrySameSubmission)
+                    OutlinedButton.icon(
+                      key: const Key('p4_retry_same_button'),
+                      onPressed: (form.isSubmitting || blocked)
+                          ? null
+                          : () => _submit(manualRetry: true),
+                      icon: const Icon(Icons.replay_rounded, size: 17),
+                      label: const Text('Retry same submission'),
+                    ),
+                  if (form.errorCode == ErrorCatalog.registrationConflict &&
+                      !form.isReclaimFlow)
+                    OutlinedButton.icon(
+                      onPressed: form.isSubmitting
+                          ? null
+                          : () => ctrl.setFlow(
+                                form.isEmployeeFlow
+                                    ? AdminRegistrationFlow
+                                        .reclaimFacultyOrStaff
+                                    : AdminRegistrationFlow
+                                        .reclaimStudentOrGuard,
+                              ),
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 17),
+                      label: const Text('Switch to expired reclaim'),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (!form.isEmployeeFlow) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Role:',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    for (final r in RegistrationRole.values)
+                      ChoiceChip(
+                        key: Key('p4_role_${r.wireValue}'),
+                        label: Text(r.label),
+                        selected: form.studentGuardRole == r,
+                        onSelected: form.isSubmitting
+                            ? null
+                            : (_) => ctrl.setStudentGuardRole(r),
+                      ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Identity kind:',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    for (final k in allowedKinds)
+                      ChoiceChip(
+                        key: Key('p4_kind_${k.wireValue}'),
+                        label: Text(k.label),
+                        selected: form.identityKind == k,
+                        onSelected: form.isSubmitting
+                            ? null
+                            : (_) => ctrl.setIdentityKind(k),
+                      ),
+                  ],
+                ),
+              ] else ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Employee role:',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    for (final r in EmployeeRegistrationRole.values)
+                      ChoiceChip(
+                        key: Key('p4_emp_role_${r.wireValue}'),
+                        label: Text(r.label),
+                        selected: form.employeeRole == r,
+                        onSelected: form.isSubmitting
+                            ? null
+                            : (_) => ctrl.setEmployeeRole(r),
+                      ),
+                  ],
+                ),
+                const StatusPill(
+                  label: 'Identity kind: employee',
+                  tone: PillTone.info,
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 680;
+              final idField = TextField(
+                key: const Key('p4_identifier_field'),
+                controller: _identifierCtrl,
+                onChanged: (v) => ctrl.updateFields(identifier: v),
+                decoration: const InputDecoration(
+                  labelText: 'University ID (identifier) *',
+                  hintText: 'e.g. 22-04123 or GUARD-104',
+                ),
+              );
+              final issuerField = TextField(
+                key: const Key('p4_issuer_field'),
+                controller: _issuerCtrl,
+                onChanged: (v) => ctrl.updateFields(identityIssuer: v),
+                decoration: const InputDecoration(
+                  labelText: 'Identity issuer *',
+                  hintText: 'e.g. batstate-u.edu.ph',
+                ),
+              );
+              final emailField = TextField(
+                key: const Key('p4_email_field'),
+                controller: _emailCtrl,
+                onChanged: (v) => ctrl.updateFields(email: v),
+                decoration: const InputDecoration(
+                  labelText: 'Institutional email *',
+                  hintText: 'e.g. user@g.batstate-u.edu.ph',
+                ),
+              );
+              final nameField = TextField(
+                key: const Key('p4_full_name_field'),
+                controller: _fullNameCtrl,
+                onChanged: (v) => ctrl.updateFields(fullName: v),
+                decoration: const InputDecoration(
+                  labelText: 'Full name *',
+                  hintText: 'e.g. Juan Dela Cruz',
+                ),
+              );
+              final buildingField = TextField(
+                key: const Key('p4_building_field'),
+                controller: _buildingCtrl,
+                onChanged: (v) => ctrl.updateFields(buildingId: v),
+                decoration: const InputDecoration(
+                  labelText: 'Building UUID (optional)',
+                  hintText: 'Canonical UUID or leave blank for null',
+                ),
+              );
+              final attestationField = form.isEmployeeFlow
+                  ? TextField(
+                      key: const Key('p4_attestation_field'),
+                      controller: _attestationCtrl,
+                      obscureText: _obscureAttestation,
+                      onChanged: (v) =>
+                          ctrl.updateFields(attestationReference: v),
+                      decoration: InputDecoration(
+                        labelText: 'Attestation reference *',
+                        helperText:
+                            '1–64 printable ASCII chars, no leading/trailing spaces.',
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(
+                            () => _obscureAttestation = !_obscureAttestation,
+                          ),
+                          icon: Icon(
+                            _obscureAttestation
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
+                      ),
+                    )
+                  : null;
+
+              if (!wide) {
+                return Column(
+                  children: [
+                    idField,
+                    const SizedBox(height: 12),
+                    issuerField,
+                    const SizedBox(height: 12),
+                    emailField,
+                    const SizedBox(height: 12),
+                    nameField,
+                    const SizedBox(height: 12),
+                    buildingField,
+                    if (attestationField != null) ...[
+                      const SizedBox(height: 12),
+                      attestationField,
+                    ],
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: idField),
+                      const SizedBox(width: 14),
+                      Expanded(child: issuerField),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: emailField),
+                      const SizedBox(width: 14),
+                      Expanded(child: nameField),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (attestationField != null)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: buildingField),
+                        const SizedBox(width: 14),
+                        Expanded(child: attestationField),
+                      ],
+                    )
+                  else
+                    buildingField,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                key: const Key('p4_submit_button'),
+                onPressed: (form.isSubmitting || blocked) ? null : _submit,
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: Text(
+                  blocked
+                      ? 'Wait ${form.retryAfterRemaining}s'
+                      : (form.isSubmitting
+                          ? 'Submitting…'
+                          : 'Submit ${_flowLabel(form.flow)}'),
+                ),
+              ),
+              OutlinedButton.icon(
+                key: const Key('p4_clear_button'),
+                onPressed: form.isSubmitting
+                    ? null
+                    : () {
+                        ctrl.resetAll();
+                        _identifierCtrl.clear();
+                        _issuerCtrl.clear();
+                        _emailCtrl.clear();
+                        _fullNameCtrl.clear();
+                        _buildingCtrl.clear();
+                        _attestationCtrl.clear();
+                      },
+                icon: const Icon(Icons.clear_all_rounded, size: 18),
+                label: const Text('Clear'),
+              ),
+              if (form.pendingIdempotencyKey != null)
+                Text(
+                  'Idempotency key active (${form.pendingIdempotencyKey!.substring(0, 8)}…)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                ),
+            ],
+          ),
+
+          if (form.lastReceipt != null) ...[
+            const SizedBox(height: 18),
+            Callout(
+              tone: PillTone.ok,
+              icon: Icons.receipt_long_outlined,
+              title: form.lastReceipt!.operationTitle,
+              message:
+                  'Registration ID: ${form.lastReceipt!.registrationId} · Delivery: ${form.lastReceipt!.activationCodeDelivery.displayTitle} · Request ID: ${form.lastReceipt!.requestId}',
+              action: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => showRegistrationReceiptDialog(
+                      context,
+                      receipt: form.lastReceipt!,
+                      onOpenActivationHelp: () => widget.onOpenActivationHelp(
+                        form.lastReceipt!.registrationId,
+                      ),
+                    ),
+                    child: const Text('View receipt'),
+                  ),
+                  FilledButton(
+                    onPressed: () => widget.onOpenActivationHelp(
+                      form.lastReceipt!.registrationId,
+                    ),
+                    child: const Text('Open Activation Help'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

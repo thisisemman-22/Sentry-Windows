@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "data": {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "display_code": "EXAMPLE-USER-01",
+    "full_name": "Example Student",
+    "role": "student",
+    "building": {
+      "id": "20000000-0000-4000-8000-000000000001",
+      "code": "EXAMPLE-BLDG",
+      "name": "Example Building"
+    },
+    "email": "example.student@example.invalid",
+    "authorized_vehicles": [
+      {
+        "id": "30000000-0000-4000-8000-000000000001",
+        "display_code": "EXAMPLE-VEH-01",
+        "vehicle_type": "car",
+        "normalized_plate": null
+      }
+    ]
+  },
+  "error": null,
+  "meta": {
+    "request_id": "90000000-0000-4000-8000-000000000002",
+    "timestamp": "2026-11-21T02:00:00Z",
+    "contract_version": "1.0.0",
+    "idempotent_replay": false
+  }
+}

@@ -233,8 +233,11 @@ void main() {
           return _jsonResponse({
             'ok': true,
             'data': {
+              'token_type': 'bearer',
               'access_token': 'fresh-token-999',
+              'access_expires_at': '2030-01-01T00:15:00Z',
               'refresh_token': 'fresh-refresh-999',
+              'refresh_expires_at': '2030-01-08T00:00:00Z',
             },
           });
         }
@@ -341,8 +344,12 @@ void main() {
       await tester.tap(find.byKey(const Key('nav_tab_administration')));
       await tester.pump();
 
-      // Open Tab 1: Manual registration
-      await tester.tap(find.byKey(const Key('admin_subtab_1')));
+      // Open Tab 3: Drivers & vehicles (Planned), then open Legacy manual form
+      await tester.tap(find.byKey(const Key('admin_subtab_3')));
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const Key('open_manual_registration_tab_button')),
+      );
       await tester.pump();
 
       // 3. Test duplicate plate 409 DATABASE_CONFLICT (UKQ 247 belongs to V001)
@@ -525,7 +532,7 @@ void main() {
           wsCoordinator: wsCoord,
         );
 
-        // Trigger T01: Normal Car Entry -> ALLOWED + 30s Hold on A-C01
+        // Trigger T01: Normal Car Entry -> ALLOWED + 30s Hold on B1-L1
         controller.triggerScenario('T01');
         final initialAttempt =
             controller.state.activeLaneAttempts['lane-car-in']!;
@@ -540,17 +547,17 @@ void main() {
         expect(expiredHoldAttempt.isHoldExpired(), isTrue);
         expect(expiredHoldAttempt.canConfirmPassage(), isFalse);
 
-        // Expire hold on lane and verify attempt is marked expired & bay A-C01 is released
+        // Expire hold on lane and verify attempt is marked expired & bay B1-L1 is released
         controller.expireHoldOrDecisionOnLane('lane-car-in');
         final afterExpiry = controller.state.activeLaneAttempts['lane-car-in']!;
         expect(afterExpiry.state, 'expired');
         expect(afterExpiry.assignmentStatus, 'released');
         expect(afterExpiry.canConfirmPassage(), isFalse);
 
-        final bayAC01 =
-            controller.state.spaces.firstWhere((s) => s.spaceCode == 'A-C01');
-        expect(bayAC01.allocationStatus, 'unassigned');
-        expect(bayAC01.visitId, isNull);
+        final bayB1L1 =
+            controller.state.spaces.firstWhere((s) => s.spaceCode == 'B1-L1');
+        expect(bayB1L1.allocationStatus, 'unassigned');
+        expect(bayB1L1.visitId, isNull);
 
         // Attempting confirmVehicleCrossedGate after expiry is blocked with 409
         final confirmRes = controller.confirmVehicleCrossedGate(

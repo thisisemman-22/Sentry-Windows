@@ -98,9 +98,9 @@ void main() {
           vehicleId: '20000000-0000-4000-8000-000000000001',
           visitId: '60000000-0000-4000-8000-000000000001', // Illegal while held!
           buildingCode: 'CET',
-          lotCode: 'A',
+          lotCode: 'B1',
           spaceId: '30000000-0000-4000-8000-000000000103',
-          spaceCode: 'A-C03',
+          spaceCode: 'B1-L3',
           status: 'held',
           createdAtUtc: DateTime.now().toUtc(),
           version: 1,
@@ -127,7 +127,7 @@ void main() {
     });
 
     test('State Separation: allowed decision holds space with visit_id == null; only passage confirmation creates active visit & assigned space', () {
-      // Initial state on lane-car-in has U001 / V001 with an ALLOWED decision and held space A-C03
+      // Initial state on lane-car-in has U001 / V001 with an ALLOWED decision and held space B1-L3
       final prePassageAttempt =
           controller.state.activeLaneAttempts['lane-car-in']!;
       expect(prePassageAttempt.latestDecision?.outcome, 'allowed');
@@ -136,7 +136,7 @@ void main() {
       expect(prePassageAttempt.passageConfirmed, isFalse);
 
       final heldSpaceBefore = controller.state.spaces
-          .firstWhere((s) => s.spaceCode == 'A-C03');
+          .firstWhere((s) => s.spaceCode == 'B1-L3');
       expect(heldSpaceBefore.allocationStatus, 'held');
       expect(heldSpaceBefore.visitId, isNull);
 
@@ -158,7 +158,7 @@ void main() {
       expect(postPassageAttempt.committedVisitId, isNotNull);
 
       final assignedSpaceAfter = controller.state.spaces
-          .firstWhere((s) => s.spaceCode == 'A-C03');
+          .firstWhere((s) => s.spaceCode == 'B1-L3');
       expect(assignedSpaceAfter.allocationStatus, 'assigned');
       expect(assignedSpaceAfter.visitId, res.data?.visitId);
     });
@@ -248,14 +248,14 @@ void main() {
     });
 
     test('Device Offline -> Unknown/Stale Space Propagation & WebSocket Sequence Gap Resync', () {
-      // Mark D05 (Lot A overhead camera) offline -> Lot A spaces must become unknown/stale and NEVER available
+      // Mark D05 (Lot B1 overhead camera) offline -> Lot B1 spaces must become unknown/stale and NEVER available
       controller.setDeviceSimulatedStatus('D05', 'offline');
-      final lotASpaces = controller.state.spaces
-          .where((s) => s.lotCode == 'A')
+      final lotB1Spaces = controller.state.spaces
+          .where((s) => s.lotCode == 'B1')
           .toList();
-      expect(lotASpaces.every((s) => s.isUnknownOrStale), isTrue);
+      expect(lotB1Spaces.every((s) => s.isUnknownOrStale), isTrue);
       expect(
-        lotASpaces.any((s) => s.isTrulyAvailableForAllocation),
+        lotB1Spaces.any((s) => s.isTrulyAvailableForAllocation),
         isFalse,
       );
 
@@ -290,7 +290,7 @@ void main() {
         correlationId: null,
         data: RealtimeUpdateData(
           resourceType: 'parking_space',
-          resourceId: 'A-C01',
+          resourceId: 'B1-L1',
           resourceVersion: 3,
           streamSequence: currentSeq + 10,
           refreshRequired: true,

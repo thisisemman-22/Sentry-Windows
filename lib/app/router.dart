@@ -10,6 +10,8 @@ import '../features/parking_management/presentation/parking_management_screen.da
 import 'providers.dart';
 
 /// Role-aware view host mapping [DesktopNavTab] to the 7 authenticated SENTRY views.
+/// Strictly enforces [RoleGate] so Guard sessions never construct [AdministrationScreen]
+/// or instantiate Administrator-only providers even if deep-linked via state.
 class DesktopViewRouter extends ConsumerWidget {
   /// When set, renders this tab regardless of the selected-tab provider
   /// (used by the shell so outgoing pages keep their content mid-transition).
@@ -17,7 +19,10 @@ class DesktopViewRouter extends ConsumerWidget {
 
   const DesktopViewRouter({super.key, this.tab});
 
-  static Widget screenFor(DesktopNavTab tab) {
+  static Widget screenFor(DesktopNavTab tab, {required bool isAdmin}) {
+    if (tab == DesktopNavTab.administration && !isAdmin) {
+      return const OverviewScreen();
+    }
     switch (tab) {
       case DesktopNavTab.overview:
         return const OverviewScreen();
@@ -38,6 +43,9 @@ class DesktopViewRouter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return screenFor(tab ?? ref.watch(selectedDesktopTabProvider));
+    final isAdmin = ref.watch(authControllerProvider.select((s) => s.role.isAdmin));
+    final DesktopNavTab selectedTab =
+        tab ?? ref.watch<DesktopNavTab>(selectedDesktopTabProvider);
+    return screenFor(selectedTab, isAdmin: isAdmin);
   }
 }

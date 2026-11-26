@@ -1,5 +1,6 @@
 import 'package:campus_parking_desktop/app/app.dart';
 import 'package:campus_parking_desktop/app/providers.dart';
+import 'package:campus_parking_desktop/app/router.dart';
 import 'package:campus_parking_desktop/core/config/app_config.dart';
 import 'package:campus_parking_desktop/core/config/roster_mode.dart';
 import 'package:campus_parking_desktop/core/network/secure_session_store.dart';
@@ -211,13 +212,19 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Parking map'), findsOneWidget);
-      // Shows 'Awaiting lot telemetry'
-      expect(find.text('Awaiting lot telemetry'), findsOneWidget);
-      // NO cycle camera state button
-      expect(
-        find.byKey(const Key('cycle_bay_physical_status_btn')),
-        findsNothing,
-      );
+      for (final lot in const ['B1', 'B2', 'B3', 'B4', 'B5']) {
+        await tester.tap(find.byKey(Key('parking_tab_$lot')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.text('Awaiting lot telemetry'), findsOneWidget);
+        expect(find.text('Occupied'), findsNothing);
+        expect(find.text('Conflict'), findsNothing);
+        expect(find.text('Held (30s)'), findsNothing);
+        expect(
+          find.byKey(const Key('cycle_bay_physical_status_btn')),
+          findsNothing,
+        );
+      }
 
       // --- TAB 5: ACCESS LOGS AUDIT ---
       await tester.tap(find.byKey(const Key('nav_tab_accessLogs')));
@@ -252,14 +259,17 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Administration'), findsAtLeastNWidgets(1));
-      // Subtab 0: Registered participants empty state
+      // Subtab 3: Drivers & vehicles (Planned) empty state
+      await tester.tap(find.byKey(const Key('admin_subtab_3')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('No registered participants loaded'), findsOneWidget);
       // NO test session expiry button
       expect(
         find.byKey(const Key('simulate_ws_1008_expiry_button')),
         findsNothing,
       );
-      // Subtab 2: Facial enrollment
+      // Subtab 2: Facial enrollment (Planned)
       await tester.tap(find.byKey(const Key('admin_subtab_2')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
@@ -269,7 +279,7 @@ void main() {
     });
 
     testWidgets(
-        '4. Role restricted panel for guard operator does NOT render simulation button in real mode',
+        '4. Guard role isolation: hides Administration tab and blocks direct router navigation in real mode',
         (tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -313,17 +323,26 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      await tester.tap(find.byKey(const Key('nav_tab_administration')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      // Guard must NEVER see the Administration nav tab in the sidebar
+      expect(find.byKey(const Key('nav_tab_administration')), findsNothing);
 
-      // Guard sees role restriction panel
-      expect(find.text('Administrator access required'), findsOneWidget);
-      // Must NOT see the 403 simulation test button
+      // Even if tab state is mutated programmatically, RoleGate keeps Guard off
+      // AdministrationScreen and never instantiates Admin-only providers.
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DesktopViewRouter)),
+      );
+      container.read(selectedDesktopTabProvider.notifier).state =
+          DesktopNavTab.administration;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.text('Administrator access required'), findsNothing);
       expect(
         find.text('Test Calling Endpoint as Guard (Verify HTTP 403 ACCESS_DENIED)'),
         findsNothing,
       );
+      expect(container.exists(adminRegistrationApiProvider), isFalse);
+      expect(container.exists(registerFormControllerProvider), isFalse);
     });
   });
 }

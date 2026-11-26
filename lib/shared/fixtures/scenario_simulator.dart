@@ -58,14 +58,18 @@ class SentrySystemState {
     final activeVisits = visits.where((v) => v.isActive).length;
     final entriesToday = visits.length;
     final exitsToday = visits.where((v) => !v.isActive).length;
-    final activeHolds = spaces.where((s) => s.allocationStatus == 'held').length;
+    final formalSpaces =
+        spaces.where((s) => s.isFormalAllocatableBay).toList();
+    final activeHolds =
+        formalSpaces.where((s) => s.allocationStatus == 'held').length;
     final pendingReviews = reviewQueue.where((r) => !r.isResolved).length;
-    final totalSpaces = spaces.length;
+    final totalSpaces = formalSpaces.length;
     final trulyAvail =
-        spaces.where((s) => s.isTrulyAvailableForAllocation).length;
-    final occSpaces =
-        spaces.where((s) => !s.isUnknownOrStale && s.physicalStatus == 'occupied').length;
-    final unkSpaces = spaces.where((s) => s.isUnknownOrStale).length;
+        formalSpaces.where((s) => s.isTrulyAvailableForAllocation).length;
+    final occSpaces = formalSpaces
+        .where((s) => !s.isUnknownOrStale && s.physicalStatus == 'occupied')
+        .length;
+    final unkSpaces = formalSpaces.where((s) => s.isUnknownOrStale).length;
     final onlineDevs =
         devices.where((d) => d.effectiveStatus() == 'online').length;
 
@@ -87,30 +91,15 @@ class SentrySystemState {
 
   List<LotSummaryDto> computeLotSummaries() {
     return [
-      LotSummaryDto.fromSpaces(
-        lotCode: 'A',
-        lotName: 'Lot A · STEER Hub & CET',
-        nearestLandmark: 'STEER Hub & CET Forecourt',
-        spaces: spaces,
-      ),
-      LotSummaryDto.fromSpaces(
-        lotCode: 'B',
-        lotName: 'Lot B · CEAFA Building',
-        nearestLandmark: 'CEAFA North Canopy',
-        spaces: spaces,
-      ),
-      LotSummaryDto.fromSpaces(
-        lotCode: 'C',
-        lotName: 'Lot C · Gymnasium & CICS',
-        nearestLandmark: 'Gov. Feliciano Leviste Gymnasium',
-        spaces: spaces,
-      ),
-      LotSummaryDto.fromSpaces(
-        lotCode: 'D',
-        lotName: 'Lot D · RGR Laboratory Annex',
-        nearestLandmark: 'RGR Academic Annex',
-        spaces: spaces,
-      ),
+      for (final meta in kCampusParkingLots)
+        LotSummaryDto.fromSpaces(
+          lotCode: meta.lotCode,
+          lotName: meta.resolveName(spaces),
+          nearestLandmark: meta.nearestLandmark,
+          spaces: spaces,
+          isOverflow: meta.isOverflow,
+          isSchematicPending: meta.isSchematicPending,
+        ),
     ];
   }
 
@@ -236,7 +225,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     final v007 = SentryFixtures.findVehicleByCode('V007')!;
     final v008 = SentryFixtures.findVehicleByCode('V008')!;
 
-    // Initial Active Lane Attempt on Car Entry Lane: U001 / V001 has ALLOWED decision + 30s held bay A-C03, awaiting passage!
+    // Initial Active Lane Attempt on Car Entry Lane: U001 / V001 has ALLOWED decision + 30s held bay B1-L3, awaiting passage!
     final carInDecision = AccessDecisionData(
       decisionId: '40000000-0000-4000-8000-000000000001',
       gateId: 'gate-north',
@@ -246,7 +235,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       outcome: 'allowed',
       reasonCode: 'AUTHORIZED',
       reasonMessage:
-          '3-way check passed: Plate OCR + ArcFace driver match verified. Bay A-C03 held for 30s.',
+          '3-way check passed: Plate OCR + ArcFace driver match verified. Bay B1-L3 held for 30s.',
       userId: v001.ownerUserId,
       vehicleId: v001.vehicleId,
       visitId: null, // Strictly null before passage confirmation!
@@ -290,8 +279,8 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       passageConfirmed: false, // Awaiting guard attestation or passage sensor!
       assignmentId: '50000000-0000-4000-8000-000000000001',
       spaceId: '30000000-0000-4000-8000-000000000103',
-      spaceCode: 'A-C03',
-      lotCode: 'A',
+      spaceCode: 'B1-L3',
+      lotCode: 'B1',
       assignmentStatus: 'held',
       holdExpiresAtUtc: now.add(const Duration(seconds: 26)),
       committedVisitId: null,
@@ -395,8 +384,8 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       passageConfirmed: false,
       assignmentId: '50000000-0000-4000-8000-000000000003',
       spaceId: '30000000-0000-4000-8000-000000000102',
-      spaceCode: 'A-C02',
-      lotCode: 'A',
+      spaceCode: 'B1-L2',
+      lotCode: 'B1',
       assignmentStatus: 'assigned',
       committedVisitId: '60000000-0000-4000-8000-000000000003',
     );
@@ -445,9 +434,9 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       gateActuationClaimed: true,
       passageConfirmed: false,
       assignmentId: '50000000-0000-4000-8000-000000000002',
-      spaceId: '30000000-0000-4000-8000-000000000108',
-      spaceCode: 'A-M02',
-      lotCode: 'A',
+      spaceId: '30000000-0000-4000-8000-000000000202',
+      spaceCode: 'B2-MB2',
+      lotCode: 'B2',
       assignmentStatus: 'assigned',
       committedVisitId: '60000000-0000-4000-8000-000000000002',
     );
@@ -462,7 +451,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       outcome: 'denied',
       reasonCode: 'DUPLICATE_ACTIVE_VISIT',
       reasonMessage:
-          'User U007 already has an active campus visit with vehicle V007 (Bay B-C04). V007 must exit before V008 can enter.',
+          'User U007 already has an active campus visit with vehicle V007 (Bay B1-R4). V007 must exit before V008 can enter.',
       userId: v008.ownerUserId,
       vehicleId: v008.vehicleId,
       visitId: null,
@@ -497,7 +486,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
 
     // Confirmed Campus Visits (Active + Closed historical)
     final initialVisits = <VisitDto>[
-      // Active Visit 1: U007 driving V007 parked at B-C04
+      // Active Visit 1: U007 driving V007 parked at B1-R4
       VisitDto(
         visitId: '60000000-0000-4000-8000-000000000007',
         visitCode: 'VS07',
@@ -513,11 +502,11 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         enteredAtUtc: now.subtract(const Duration(hours: 1, minutes: 42)),
         entryConfirmationSource: 'sensor',
         assignmentId: '50000000-0000-4000-8000-000000000007',
-        lotCode: 'B',
-        spaceId: '30000000-0000-4000-8000-000000000204',
-        spaceCode: 'B-C04',
+        lotCode: 'B1',
+        spaceId: '30000000-0000-4000-8000-000000000124',
+        spaceCode: 'B1-R4',
       ),
-      // Active Visit 2: U003 driving V003 parked at A-C02
+      // Active Visit 2: U003 driving V003 parked at B1-L2
       VisitDto(
         visitId: '60000000-0000-4000-8000-000000000003',
         visitCode: 'VS03',
@@ -533,11 +522,11 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         enteredAtUtc: now.subtract(const Duration(hours: 2, minutes: 15)),
         entryConfirmationSource: 'sensor',
         assignmentId: '50000000-0000-4000-8000-000000000003',
-        lotCode: 'A',
+        lotCode: 'B1',
         spaceId: '30000000-0000-4000-8000-000000000102',
-        spaceCode: 'A-C02',
+        spaceCode: 'B1-L2',
       ),
-      // Active Visit 3: U002 riding V002 parked at A-M02
+      // Active Visit 3: U002 riding V002 parked at B2-MB2
       VisitDto(
         visitId: '60000000-0000-4000-8000-000000000002',
         visitCode: 'VS02',
@@ -553,9 +542,9 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         enteredAtUtc: now.subtract(const Duration(minutes: 54)),
         entryConfirmationSource: 'guard_attestation',
         assignmentId: '50000000-0000-4000-8000-000000000002',
-        lotCode: 'A',
-        spaceId: '30000000-0000-4000-8000-000000000108',
-        spaceCode: 'A-M02',
+        lotCode: 'B2',
+        spaceId: '30000000-0000-4000-8000-000000000202',
+        spaceCode: 'B2-MB2',
       ),
       // Historical Closed Visit 4: U007 driving V008 earlier today (completed exit!)
       // Demonstrates V007 and V008 have distinct, non-merged histories under U007!
@@ -579,9 +568,9 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         exitedAtUtc: now.subtract(const Duration(hours: 3, minutes: 10)),
         exitConfirmationSource: 'sensor',
         assignmentId: '50000000-0000-4000-8000-000000000008',
-        lotCode: 'C',
+        lotCode: 'B3',
         spaceId: '30000000-0000-4000-8000-000000000301',
-        spaceCode: 'C-C01',
+        spaceCode: 'B3-L1',
       ),
       // Historical Closed Visit 5: U005 driving V005 earlier today
       VisitDto(
@@ -604,9 +593,9 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         exitedAtUtc: now.subtract(const Duration(hours: 1, minutes: 05)),
         exitConfirmationSource: 'guard_attestation',
         assignmentId: '50000000-0000-4000-8000-000000000005',
-        lotCode: 'D',
-        spaceId: '30000000-0000-4000-8000-000000000401',
-        spaceCode: 'D-C01',
+        lotCode: 'B5',
+        spaceId: '30000000-0000-4000-8000-000000000501',
+        spaceCode: 'B5-OF01',
       ),
     ];
 
@@ -647,7 +636,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         outcome: 'review_required',
         reasonCode: 'OCCUPANCY_CONFLICT',
         reasonMessage:
-            'Preferred bay A-C05 reported physical_status=occupied by overhead camera while allocation_status=unassigned.',
+            'Preferred bay B1-L5 reported physical_status=occupied by overhead camera while allocation_status=unassigned.',
         currentAttemptVersion: 1,
         attemptState: 'guard_review_required',
         createdAtUtc: now.subtract(const Duration(minutes: 2)),
@@ -740,7 +729,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         resourceId: '60000000-0000-4000-8000-000000000005',
         requestId: 'req-attest-0088',
         summary:
-            'Guard G001 confirmed car V005 physical exit at Gate 1 exit lane. Closed visit VS05-HIST and released bay D-C01.',
+            'Guard G001 confirmed car V005 physical exit at Gate 1 exit lane. Closed visit VS05-HIST and released bay B5-OF01.',
       ),
       AuditLogDto(
         auditId: 'AUD-9003',
@@ -800,10 +789,10 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
       participantDirectory: directory,
       faceEnrollments: initialFaceEnrollments,
       recentActivityFeed: const [
-        'GATE-NORTH/CAR-IN: V001 (U001) ALLOWED · Space A-C03 HELD (30s) · Awaiting physical passage confirmation',
+        'GATE-NORTH/CAR-IN: V001 (U001) ALLOWED · Space B1-L3 HELD (30s) · Awaiting physical passage confirmation',
         'GATE-NORTH/MOTO-IN: V004 (U004) REVIEW_REQUIRED (IDENTITY_UNCERTAIN · 0.52 cosine similarity)',
-        'LOT A OVERHEAD CAM: Bay A-C05 reported OCCUPANCY_CONFLICT (physical=occupied, allocation=unassigned)',
-        'GATE-NORTH/CAR-IN: V008 (U007) DENIED (DUPLICATE_ACTIVE_VISIT · V007 already active in B-C04)',
+        'LOT B1 OVERHEAD CAM: Bay B1-L5 reported OCCUPANCY_CONFLICT (physical=occupied, allocation=unassigned)',
+        'GATE-NORTH/CAR-IN: V008 (U007) DENIED (DUPLICATE_ACTIVE_VISIT · V007 already active in B1-R4)',
       ],
       wsState: WsStreamState(
         status: WsConnectionStatus.connected,
@@ -1483,7 +1472,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     String feedMsg = '';
 
     switch (scenarioCode) {
-      case 'T01': // Normal Car Entry (U001 / V001) -> Allowed + 30s Hold on A-C01
+      case 'T01': // Normal Car Entry (U001 / V001) -> Allowed + 30s Hold on B1-L1
         final v001 = SentryFixtures.findVehicleByCode('V001')!;
         final decision = AccessDecisionData(
           decisionId: decId,
@@ -1494,7 +1483,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           outcome: 'allowed',
           reasonCode: 'AUTHORIZED',
           reasonMessage:
-              'T01: Plate ${v001.normalizedPlate(mode)} + ArcFace matched U001 (0.85 cosine similarity). Bay A-C01 held for 30s.',
+              'T01: Plate ${v001.normalizedPlate(mode)} + ArcFace matched U001 (0.85 cosine similarity). Bay B1-L1 held for 30s.',
           userId: v001.ownerUserId,
           vehicleId: v001.vehicleId,
           visitId: null, // Strictly null before passage!
@@ -1530,15 +1519,15 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           passageConfirmed: false,
           assignmentId: decision.assignmentId,
           spaceId: '30000000-0000-4000-8000-000000000101',
-          spaceCode: 'A-C01',
-          lotCode: 'A',
+          spaceCode: 'B1-L1',
+          lotCode: 'B1',
           assignmentStatus: 'held',
           holdExpiresAtUtc: now.add(const Duration(seconds: 30)),
           committedVisitId: null,
         );
         updatedLanes['lane-car-in'] = attempt;
         updatedSpaces = updatedSpaces.map((s) {
-          if (s.spaceCode == 'A-C01') {
+          if (s.spaceCode == 'B1-L1') {
             return s.copyWith(
               allocationStatus: 'held',
               assignmentId: decision.assignmentId,
@@ -1551,7 +1540,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           return s;
         }).toList();
         feedMsg =
-            'SCENARIO T01: Normal Car Entry (U001 / V001) -> ALLOWED + 30s Space Hold on A-C01 (visit_id=null until passage confirmed)';
+            'SCENARIO T01: Normal Car Entry (U001 / V001) -> ALLOWED + 30s Space Hold on B1-L1 (visit_id=null until passage confirmed)';
         break;
 
       case 'T02': // Plate + Wrong Face Mismatch -> DENIED: IDENTITY_MISMATCH
@@ -1643,7 +1632,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
             'SCENARIO T03: Unregistered Plate XYZ9999 -> Hard Denial (UNKNOWN_CREDENTIAL)';
         break;
 
-      case 'T04': // Normal Motorcycle Entry (U006 / V006 RFID + Face) -> Allowed + 30s Hold on A-M01
+      case 'T04': // Normal Motorcycle Entry (U006 / V006 RFID + Face) -> Allowed + 30s Hold on B2-MB1
         final v006 = SentryFixtures.findVehicleByCode('V006')!;
         final decision = AccessDecisionData(
           decisionId: decId,
@@ -1654,7 +1643,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           outcome: 'allowed',
           reasonCode: 'AUTHORIZED',
           reasonMessage:
-              'T04: ESP32 RFID ${v006.rfidUid} + ArcFace matched U006 (0.82 cosine similarity). Motorcycle bay A-M01 held for 30s.',
+              'T04: ESP32 RFID ${v006.rfidUid} + ArcFace matched U006 (0.82 cosine similarity). Motorcycle bay B2-MB1 held for 30s.',
           userId: v006.ownerUserId,
           vehicleId: v006.vehicleId,
           visitId: null,
@@ -1687,16 +1676,16 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           gateClaimedAtUtc: now,
           passageConfirmed: false,
           assignmentId: decision.assignmentId,
-          spaceId: '30000000-0000-4000-8000-000000000107',
-          spaceCode: 'A-M01',
-          lotCode: 'A',
+          spaceId: '30000000-0000-4000-8000-000000000201',
+          spaceCode: 'B2-MB1',
+          lotCode: 'B2',
           assignmentStatus: 'held',
           holdExpiresAtUtc: now.add(const Duration(seconds: 30)),
           committedVisitId: null,
         );
         updatedLanes['lane-moto-in'] = attempt;
         updatedSpaces = updatedSpaces.map((s) {
-          if (s.spaceCode == 'A-M01') {
+          if (s.spaceCode == 'B2-MB1') {
             return s.copyWith(
               allocationStatus: 'held',
               assignmentId: decision.assignmentId,
@@ -1709,7 +1698,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           return s;
         }).toList();
         feedMsg =
-            'SCENARIO T04: Motorcycle Entry (U006 / V006 RFID 04112233 + Face) -> ALLOWED + 30s Hold on A-M01';
+            'SCENARIO T04: Motorcycle Entry (U006 / V006 RFID 04112233 + Face) -> ALLOWED + 30s Hold on B2-MB1';
         break;
 
       case 'T06': // Revoked Motorcycle RFID -> DENIED: CREDENTIAL_REVOKED
@@ -1763,7 +1752,7 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           outcome: 'denied',
           reasonCode: 'DUPLICATE_ACTIVE_VISIT',
           reasonMessage:
-              'T07: Multi-vehicle constraint (uq_access_visits_active_user): U007 already has an active campus visit with V007 in Bay B-C04. V007 must exit before V008 can enter.',
+              'T07: Multi-vehicle constraint (uq_access_visits_active_user): U007 already has an active campus visit with V007 in Bay B1-R4. V007 must exit before V008 can enter.',
           userId: v008.ownerUserId,
           vehicleId: v008.vehicleId,
           visitId: null,
@@ -1945,9 +1934,9 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
           gateClaimedAtUtc: now,
           passageConfirmed: false,
           assignmentId: '50000000-0000-4000-8000-000000000007',
-          spaceId: '30000000-0000-4000-8000-000000000204',
-          spaceCode: 'B-C04',
-          lotCode: 'B',
+          spaceId: '30000000-0000-4000-8000-000000000124',
+          spaceCode: 'B1-R4',
+          lotCode: 'B1',
           assignmentStatus: 'assigned',
           committedVisitId: '60000000-0000-4000-8000-000000000007',
         );

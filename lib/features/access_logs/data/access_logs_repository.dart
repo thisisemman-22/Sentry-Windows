@@ -1,11 +1,15 @@
+import 'dart:typed_data';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_envelope.dart';
 import '../../../shared/models/visit_models.dart';
+
+typedef RealAccessLogsRepository = AccessLogsRepository;
 
 /// Repository adapter for View 6 (`access_logs`) supporting:
 /// - `GET /api/v1/access-visits` (with `limit`, `cursor`, `date_from`, `date_to`,
 ///   `status`, `vehicle_code`, `user_code`, `gate_id`)
 /// - `GET /api/v1/access-visits/{visit_id}`
+/// - `GET /api/v1/reports/export` (CSV / PDF report export)
 class AccessLogsRepository {
   final ApiClient apiClient;
 
@@ -45,6 +49,24 @@ class AccessLogsRepository {
     return apiClient.get<VisitDto>(
       '/api/v1/access-visits/$visitId',
       parser: (json) => VisitDto.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  // TODO(API): Confirm exact report export path with Patrick Carpio
+  Future<ApiEnvelope<Uint8List>> exportReportReal({
+    required String format, // 'csv' | 'pdf'
+    required String scope, // 'campus_visits' | 'gate_attempts' | 'parking_utilization' | 'audit_logs'
+    required DateTime dateFromUtc,
+    required DateTime dateToUtc,
+  }) {
+    return apiClient.getBytes(
+      '/api/v1/reports/export',
+      queryParameters: {
+        'format': format,
+        'scope': scope,
+        'date_from': ManilaTime.toUtcIso(dateFromUtc),
+        'date_to': ManilaTime.toUtcIso(dateToUtc),
+      },
     );
   }
 }

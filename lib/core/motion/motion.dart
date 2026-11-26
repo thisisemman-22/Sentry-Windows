@@ -20,6 +20,12 @@ class SentryMotion {
   static const Duration medium = Duration(milliseconds: 380);
   static const Duration long = Duration(milliseconds: 620);
 
+  /// Spatial command-center Bento & chart motion timings.
+  static const Duration bentoStagger = Duration(milliseconds: 40);
+  static const Duration bentoEntrance = Duration(milliseconds: 220);
+  static const Duration chartTransition = Duration(milliseconds: 350);
+  static const Duration donutTransition = Duration(milliseconds: 400);
+
   /// Delay between consecutive items in a staggered reveal.
   static const Duration stagger = Duration(milliseconds: 55);
 
@@ -28,6 +34,79 @@ class SentryMotion {
 
   static Duration of(BuildContext context, Duration d) =>
       reduced(context) ? Duration.zero : d;
+}
+
+/// Staggered Bento card entrance (`fadeIn` + subtle fractional `slideY`)
+/// powered by a frame-synced [AnimationController] with [Interval] stagger so
+/// single-pump widget tests never see pending `Timer` leaks.
+class BentoReveal extends StatefulWidget {
+  final Widget child;
+  final int index;
+  final Duration? delay;
+  final double slideYBegin;
+
+  const BentoReveal({
+    super.key,
+    required this.child,
+    this.index = 0,
+    this.delay,
+    this.slideYBegin = 0.03,
+  });
+
+  @override
+  State<BentoReveal> createState() => _BentoRevealState();
+}
+
+class _BentoRevealState extends State<BentoReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    final delayMs =
+        (widget.delay ?? (SentryMotion.bentoStagger * widget.index))
+            .inMilliseconds;
+    final moveMs = SentryMotion.bentoEntrance.inMilliseconds;
+    final totalMs = math.max(1, delayMs + moveMs);
+    final startFraction = (delayMs / totalMs).clamp(0.0, 0.85);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs),
+    );
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(startFraction, 1.0, curve: Curves.easeOutCubic),
+    );
+    _fade = curved;
+    _slide = Tween<Offset>(
+      begin: Offset(0, widget.slideYBegin),
+      end: Offset.zero,
+    ).animate(curved);
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (SentryMotion.reduced(context)) return widget.child;
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: widget.child,
+      ),
+    );
+  }
 }
 
 /// Progressive entrance: content fades in and rises smoothly using a frame-synced
@@ -144,13 +223,16 @@ class AnimatedCount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveStyle = (style ?? const TextStyle()).copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
     return TweenAnimationBuilder<double>(
       tween: Tween(end: value.toDouble()),
-      duration: SentryMotion.of(context, SentryMotion.long),
-      curve: SentryMotion.emphasized,
+      duration: SentryMotion.of(context, SentryMotion.chartTransition),
+      curve: Curves.easeOutCubic,
       builder: (context, v, _) => Text(
         '$prefix${v.round()}$suffix',
-        style: style,
+        style: effectiveStyle,
         semanticsLabel: '$prefix$value$suffix',
       ),
     );

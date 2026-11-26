@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "data": {
+    "access_token": "EXAMPLE-OPAQUE-ACCESS-TOKEN-2",
+    "refresh_token": "EXAMPLE-OPAQUE-REFRESH-TOKEN-2",
+    "token_type": "bearer",
+    "access_expires_at": "2026-11-21T03:15:00Z",
+    "refresh_expires_at": "2026-11-22T03:00:00Z"
+  },
+  "error": null,
+  "meta": {
+    "request_id": "90000000-0000-4000-8000-000000000008",
+    "timestamp": "2026-11-21T03:00:00Z",
+    "contract_version": "1.0.0",
+    "idempotent_replay": false
+  }
+}

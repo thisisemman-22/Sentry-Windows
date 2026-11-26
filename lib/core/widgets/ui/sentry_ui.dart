@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../motion/motion.dart';
@@ -137,6 +138,57 @@ class _SentryCardState extends State<SentryCard> {
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
           child: card,
+        ),
+      ),
+    );
+  }
+}
+
+/// Lightweight frosted-glass surface for floating spatial overlays (search bar,
+/// map layer pills, blueprint zoom/tab controls, and callouts).
+///
+/// Caps blur sigma at <= 10.0 so Windows desktop rendering remains smooth at 60fps.
+class FrostedSurface extends StatelessWidget {
+  final Widget child;
+  final double radius;
+  final double blurSigma;
+  final EdgeInsetsGeometry? padding;
+  final Color? color;
+  final Color? borderColor;
+  final List<BoxShadow>? shadows;
+
+  const FrostedSurface({
+    super.key,
+    required this.child,
+    this.radius = 16,
+    this.blurSigma = 10.0,
+    this.padding,
+    this.color,
+    this.borderColor,
+    this.shadows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    final sigma = blurSigma.clamp(0.0, 10.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: color ?? p.card.withValues(alpha: p.isDark ? 0.80 : 0.84),
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: borderColor ??
+                  p.line.withValues(alpha: p.isDark ? 0.85 : 0.95),
+              width: 1,
+            ),
+            boxShadow: shadows ?? p.shadowSoft,
+          ),
+          child: child,
         ),
       ),
     );
@@ -940,113 +992,135 @@ Future<T?> showDetailsSheet<T>(
   required WidgetBuilder builder,
   List<Widget> Function(BuildContext)? actionsBuilder,
   double width = 520,
+  bool frosted = false,
 }) {
   final reduced = SentryMotion.reduced(context);
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close details',
-    barrierColor: Colors.black.withValues(alpha: 0.32),
-    transitionDuration:
-        reduced ? Duration.zero : const Duration(milliseconds: 380),
+    barrierColor: Colors.black.withValues(alpha: frosted ? 0.28 : 0.32),
+    transitionDuration: reduced
+        ? Duration.zero
+        : Duration(milliseconds: frosted ? 220 : 380),
     pageBuilder: (ctx, _, __) {
       final p = SentryPalette.of(ctx);
       final screenW = MediaQuery.sizeOf(ctx).width;
       final sheetW = (screenW - 28).clamp(280.0, width);
+      final sheetBody = Material(
+        color: frosted
+            ? p.card.withValues(alpha: p.isDark ? 0.88 : 0.92)
+            : p.card,
+        elevation: 0,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          width: sheetW,
+          height: double.infinity,
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): () =>
+                  Navigator.of(ctx).maybePop(),
+            },
+            child: FocusScope(
+              autofocus: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(26, 22, 14, 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  title,
+                                  style: SentryTheme.display(
+                                    fontSize: 24,
+                                    color: p.text,
+                                  ),
+                                ),
+                              ),
+                              if (subtitle != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  subtitle,
+                                  style: Theme.of(ctx).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close (Esc)',
+                          onPressed: () => Navigator.of(ctx).maybePop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(color: p.line, height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(26, 18, 26, 26),
+                      child: builder(ctx),
+                    ),
+                  ),
+                  if (actionsBuilder != null) ...[
+                    Divider(color: p.line, height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: actionsBuilder(ctx),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final panel = frosted
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: p.line, width: 1),
+                    boxShadow: p.shadowRaised,
+                  ),
+                  child: sheetBody,
+                ),
+              ),
+            )
+          : sheetBody;
+
       return SafeArea(
         child: Align(
           alignment: Alignment.centerRight,
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Material(
-              color: p.card,
-              elevation: 0,
-              borderRadius: BorderRadius.circular(24),
-              clipBehavior: Clip.antiAlias,
-              child: SizedBox(
-                width: sheetW,
-                height: double.infinity,
-                child: CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(LogicalKeyboardKey.escape): () =>
-                      Navigator.of(ctx).maybePop(),
-                },
-                child: FocusScope(
-                  autofocus: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(26, 22, 14, 14),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Semantics(
-                                    header: true,
-                                    child: Text(
-                                      title,
-                                      style: SentryTheme.display(
-                                        fontSize: 24,
-                                        color: p.text,
-                                      ),
-                                    ),
-                                  ),
-                                  if (subtitle != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      subtitle,
-                                      style:
-                                          Theme.of(ctx).textTheme.bodyMedium,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Close (Esc)',
-                              onPressed: () => Navigator.of(ctx).maybePop(),
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Divider(color: p.line, height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(26, 18, 26, 26),
-                          child: builder(ctx),
-                        ),
-                      ),
-                      if (actionsBuilder != null) ...[
-                        Divider(color: p.line, height: 1),
-                        Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Wrap(
-                            alignment: WrapAlignment.end,
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: actionsBuilder(ctx),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            child: panel,
           ),
-        ),
         ),
       );
     },
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(
         parent: anim,
-        curve: SentryMotion.emphasized,
+        curve: frosted ? Curves.easeOutCubic : SentryMotion.emphasized,
         reverseCurve: SentryMotion.exit,
       );
       return FadeTransition(
@@ -1098,12 +1172,16 @@ class ScreenScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 640;
+    final w = MediaQuery.sizeOf(context).width;
+    final compact = w < 640;
+    final padding = compact
+        ? const EdgeInsets.fromLTRB(16, 18, 16, 32)
+        : (w < 1320
+            ? const EdgeInsets.fromLTRB(24, 24, 24, 40)
+            : const EdgeInsets.fromLTRB(36, 30, 36, 48));
     return Scrollbar(
       child: SingleChildScrollView(
-        padding: compact
-            ? const EdgeInsets.fromLTRB(16, 18, 16, 32)
-            : const EdgeInsets.fromLTRB(36, 30, 36, 48),
+        padding: padding,
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(

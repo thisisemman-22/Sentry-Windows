@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../app/desktop_shell.dart';
 import '../../../app/providers.dart';
 import '../../../core/motion/motion.dart';
 import '../../../core/theme/sentry_colors.dart';
 import '../../../core/theme/sentry_theme.dart';
+import '../../../core/widgets/plate_badge.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
+import '../../../shared/models/attempt_models.dart';
 import '../../../shared/models/parking_models.dart';
+import '../../access_logs/presentation/report_export_dialog.dart';
+import 'campus_tactical_map.dart';
+import 'overview_charts.dart';
+import 'spatial_glass.dart';
 
-/// View 2: `Overview` — calm, single-glance campus summary.
-///
-/// Progressive disclosure:
-/// - Top row: 4 large animated [MetricTile]s (one number + one plain label each).
-/// - Left column: Lots A–D with a single animated [CapacityBar] per lot; click a
-///   lot card to open its dual-state camera vs. reservation breakdown in a side
-///   sheet without cluttering the main canvas.
-/// - Right column: Recent gate activity + compact device health summary.
+/// View 2: `Overview` — Full-bleed Spatial Command-Center Canvas inspired by
+/// the Vinora OS reference adapted into BatStateU Crimson + Pure OLED / Porcelain.
 class OverviewScreen extends ConsumerWidget {
   const OverviewScreen({super.key});
 
@@ -29,275 +30,251 @@ class OverviewScreen extends ConsumerWidget {
         sysState.spaces.isNotEmpty ||
         sysState.visits.isNotEmpty ||
         sysState.devices.isNotEmpty;
+    final awaitingLotTelemetry = config.isReal && sysState.spaces.isEmpty;
+    final activeAttempt = _pickFocusAttempt(sysState.activeLaneAttempts.values);
+    final occupancyRatio = kpis.totalCampusSpaces > 0
+        ? (1.0 - (kpis.trulyAvailableSpaces / kpis.totalCampusSpaces))
+            .clamp(0.0, 1.0)
+        : 0.0;
 
-    return ScreenScaffold(
-      children: [
-        PageIntro(
-          title: 'Campus overview',
-          subtitle: 'Live gate flow and bay availability across Lots A to D.',
-          actions: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktopSpatial =
+            constraints.maxWidth >= 1020 && constraints.maxHeight >= 640;
+
+        if (!desktopSpatial) {
+          return _CompactSpatialOverview(
+            sysState: sysState,
+            kpis: kpis,
+            lotSummaries: lotSummaries,
+            hasLiveSnapshot: hasLiveSnapshot,
+            awaitingLotTelemetry: awaitingLotTelemetry,
+            isRealMode: config.isReal,
+            activeAttempt: activeAttempt,
+            occupancyRatio: occupancyRatio,
+            onInspectLot: (lot) => _showLotDetails(context, ref, lot),
+          );
+        }
+
+        final rightPanelW = constraints.maxWidth >= 1380 ? 412.0 : 356.0;
+        final mapOverlayHeader = Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _FloatingSearchPill(
+              onTap: () => showCommandPalette(context, ref),
+            ),
             if (config.isReal)
-              OutlinedButton.icon(
+              _GlassActionButton(
                 key: const Key('overview_retry_button'),
+                icon: Icons.refresh_rounded,
+                label: 'Retry',
                 onPressed: () {
-                  ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
+                  ref
+                      .read(sentryScenarioProvider.notifier)
+                      .refreshRealSnapshot();
                 },
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Retry'),
               ),
-            OutlinedButton.icon(
+            const SpatialGlass(
+              radius: 999,
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: ExportReportMenuButton(
+                buttonKey: Key('overview_export_report_button'),
+                defaultScope: ReportExportScope.parkingUtilization,
+              ),
+            ),
+            _GlassActionButton(
+              icon: Icons.videocam_outlined,
+              label: 'Gate lanes',
               onPressed: () {
                 ref.read(selectedDesktopTabProvider.notifier).state =
                     DesktopNavTab.liveGateMonitoring;
               },
-              icon: const Icon(Icons.videocam_outlined, size: 18),
-              label: const Text('Open live gates'),
-            ),
-            FilledButton.icon(
-              onPressed: () {
-                ref.read(selectedDesktopTabProvider.notifier).state =
-                    DesktopNavTab.parkingManagement;
-              },
-              icon: const Icon(Icons.local_parking_rounded, size: 18),
-              label: const Text('View parking map'),
             ),
           ],
-        ),
-        if (config.isReal && sysState.lastRealApiError != null) ...[
-          const SizedBox(height: 16),
-          Callout(
-            tone: PillTone.warn,
-            icon: Icons.cloud_off_rounded,
-            title: 'FastAPI backend unreachable',
-            message:
-                '${sysState.lastRealApiError!.code}: ${sysState.lastRealApiError!.message}',
-            action: OutlinedButton.icon(
-              onPressed: () {
-                ref.read(sentryScenarioProvider.notifier).refreshRealSnapshot();
-              },
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Retry'),
-            ),
-          ),
-        ],
-        const SizedBox(height: 26),
+        );
 
-        // 1. 4-Card KPI Row (one big number per card)
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final tiles = [
-              MetricTile(
-                revealIndex: 1,
-                label: 'Confirmed inside',
-                value: kpis.activeVisitsCount,
-                valueDisplay: hasLiveSnapshot ? null : '—',
-                caption: !hasLiveSnapshot
-                    ? 'Awaiting backend connection'
-                    : kpis.activeHoldsAwaitingPassageCount > 0
-                        ? '${kpis.activeHoldsAwaitingPassageCount} waiting to cross at gate'
-                        : 'All gate holds cleared',
-                icon: Icons.directions_car_filled_outlined,
-                tone: hasLiveSnapshot ? PillTone.ok : PillTone.neutral,
-                hint:
-                    'Only counts vehicles that have physically crossed the gate. '
-                    'Pre-passage 30s holds are tracked separately.',
-                onTap: () {
-                  ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.accessLogs;
-                },
-              ),
-              MetricTile(
-                revealIndex: 2,
-                label: 'Entries today',
-                value: kpis.entriesTodayCount,
-                valueDisplay: hasLiveSnapshot ? null : '—',
-                suffix: hasLiveSnapshot ? 'in · ${kpis.exitsTodayCount} out' : null,
-                caption: !hasLiveSnapshot
-                    ? 'Awaiting backend connection'
-                    : '${kpis.activeHoldsAwaitingPassageCount} active gate hold(s)',
-                icon: Icons.swap_vert_circle_outlined,
-                tone: hasLiveSnapshot ? PillTone.info : PillTone.neutral,
-                onTap: () {
-                  ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.liveGateMonitoring;
-                },
-              ),
-              MetricTile(
-                revealIndex: 3,
-                label: 'Pending guard reviews',
-                value: kpis.pendingGuardReviewsCount,
-                valueDisplay: hasLiveSnapshot ? null : '—',
-                caption: !hasLiveSnapshot
-                    ? 'Awaiting backend connection'
-                    : kpis.pendingGuardReviewsCount == 0
-                        ? 'Queue is clear'
-                        : 'Waiting for guard decision',
-                icon: Icons.fact_check_outlined,
-                tone: !hasLiveSnapshot
-                    ? PillTone.neutral
-                    : (kpis.pendingGuardReviewsCount > 0
-                        ? PillTone.warn
-                        : PillTone.ok),
-                onTap: () {
-                  ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.guardReviews;
-                },
-              ),
-              MetricTile(
-                revealIndex: 4,
-                label: 'Free parking bays',
-                value: kpis.trulyAvailableSpaces,
-                valueDisplay: hasLiveSnapshot ? null : '—',
-                suffix: hasLiveSnapshot ? '/ ${kpis.totalCampusSpaces}' : null,
-                caption: !hasLiveSnapshot
-                    ? 'Awaiting backend connection'
-                    : '${kpis.occupiedSpaces} occupied · ${kpis.heldSpaces} held',
-                icon: Icons.local_parking_rounded,
-                tone: hasLiveSnapshot ? PillTone.crimson : PillTone.neutral,
-                hint:
-                    'Bays with unknown or stale camera readings (${kpis.unknownOrStaleSpaces}) '
-                    'are excluded from free count for safety.',
-                onTap: () {
-                  ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.parkingManagement;
-                },
-              ),
-            ];
-
-            if (constraints.maxWidth < 920) {
-              return Column(
-                children: [
-                  for (final t in tiles) ...[
-                    t,
-                    const SizedBox(height: 14),
-                  ],
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < tiles.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 16),
-                  Expanded(child: tiles[i]),
-                ],
-              ],
-            );
-          },
-        ),
-
-        const SizedBox(height: 24),
-
-        // 2. Main Split: Parking Lots (Left) + Activity & Devices (Right)
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final lotsCard = Reveal(
-              index: 5,
-              child: SentryCard(
-                padding: const EdgeInsets.all(26),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SectionHeader(
-                      title: 'Parking lots A to D',
-                      subtitle: 'Click any lot to inspect camera vs. reservation state.',
-                      hint:
-                          'Physical overhead camera state (empty / occupied / unknown) '
-                          'is tracked separately from backend reservations (open / held / assigned).',
-                      trailing: Wrap(
-                        spacing: 14,
-                        runSpacing: 6,
-                        children: [
-                          LegendDot(color: p.ok, label: 'Free'),
-                          LegendDot(color: p.crimson, label: 'Occupied'),
-                          LegendDot(color: p.warn, label: 'Held (30s)'),
-                          LegendDot(color: p.muted, label: 'Unknown'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (sysState.spaces.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: EmptyState(
-                          icon: Icons.local_parking_rounded,
-                          title: 'Awaiting parking lot telemetry',
-                          message:
-                              'Real bay occupancy and camera telemetry will populate once the backend connects.',
-                        ),
-                      )
-                    else
-                      for (var i = 0; i < lotSummaries.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 12),
-                        _LotSummaryRow(
-                          lot: lotSummaries[i],
-                          onTap: () => _showLotDetails(context, ref, lotSummaries[i]),
-                        ),
-                      ],
-                  ],
-                ),
-              ),
-            );
-
-            final rightCol = Column(
+        final rightColumn = Positioned(
+          top: 18,
+          right: 18,
+          bottom: 18,
+          width: rightPanelW,
+          child: SingleChildScrollView(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Reveal(
-                  index: 6,
-                  child: _RecentActivityCard(
+                if (config.isReal && sysState.lastRealApiError != null) ...[
+                  SpatialGlass(
+                    strong: true,
+                    radius: 20,
+                    padding: const EdgeInsets.all(16),
+                    child: Callout(
+                      tone: PillTone.warn,
+                      icon: Icons.cloud_off_rounded,
+                      title: 'FastAPI backend unreachable',
+                      message:
+                          '${sysState.lastRealApiError!.code}: ${sysState.lastRealApiError!.message}',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                BentoReveal(
+                  index: 3,
+                  child: _CampusOverviewBentoPanel(
+                    kpis: kpis,
+                    activeLanesCount: sysState.activeLaneAttempts.length,
+                    hasLiveSnapshot: hasLiveSnapshot,
+                    awaitingLotTelemetry: awaitingLotTelemetry,
+                    occupancyRatio: occupancyRatio,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                BentoReveal(
+                  index: 4,
+                  child: _ActiveGateEncounterCard(
+                    attempt: activeAttempt,
+                    hasLiveSnapshot: hasLiveSnapshot,
+                    onJumpToGate: (laneId) {
+                      if (laneId != null) {
+                        ref.read(focusedLaneProvider.notifier).state = laneId;
+                      }
+                      ref.read(selectedDesktopTabProvider.notifier).state =
+                          DesktopNavTab.liveGateMonitoring;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                BentoReveal(
+                  index: 5,
+                  child: _RecentActivityGlassCard(
                     events: sysState.recentActivityFeed,
+                    onlineDevices: kpis.onlineDevicesCount,
+                    totalDevices: kpis.totalDevicesCount,
                     onViewAll: () {
                       ref.read(selectedDesktopTabProvider.notifier).state =
                           DesktopNavTab.accessLogs;
                     },
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Reveal(
-                  index: 7,
-                  child: _DevicesCompactCard(
-                    onlineCount: kpis.onlineDevicesCount,
-                    totalCount: kpis.totalDevicesCount,
-                    onInspect: () {
+                    onInspectDevices: () {
                       ref.read(selectedDesktopTabProvider.notifier).state =
                           DesktopNavTab.deviceMonitoring;
                     },
                   ),
                 ),
               ],
-            );
+            ),
+          ),
+        );
 
-            if (constraints.maxWidth < 980) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  lotsCard,
-                  const SizedBox(height: 18),
-                  rightCol,
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 6, child: lotsCard),
-                const SizedBox(width: 20),
-                Expanded(flex: 4, child: rightCol),
-              ],
-            );
-          },
-        ),
-      ],
+        final bottomChartsRow = Positioned(
+          left: 18,
+          bottom: 18,
+          right: rightPanelW + 30,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                flex: 46,
+                child: BentoReveal(
+                  index: 1,
+                  child: CampusMixDonutCard(
+                    lotSummaries: lotSummaries,
+                    spaces: sysState.spaces,
+                    hasLiveSnapshot:
+                        !awaitingLotTelemetry && sysState.spaces.isNotEmpty,
+                    onOpenParking: () {
+                      ref.read(selectedDesktopTabProvider.notifier).state =
+                          DesktopNavTab.parkingManagement;
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 54,
+                child: BentoReveal(
+                  index: 2,
+                  child: GateActivityBarChartCard(
+                    visits: sysState.visits,
+                    attemptHistory: sysState.attemptHistory,
+                    hasLiveSnapshot: hasLiveSnapshot,
+                    onExpand: () {
+                      ref.read(selectedDesktopTabProvider.notifier).state =
+                          DesktopNavTab.accessLogs;
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: p.lotGround,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: p.line, width: 1),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: CampusTacticalMap(
+                  lotSummaries: lotSummaries,
+                  allSpaces: sysState.spaces,
+                  awaitingTelemetry: awaitingLotTelemetry,
+                  playInsets: EdgeInsets.fromLTRB(
+                    20,
+                    118,
+                    rightPanelW + 28,
+                    242,
+                  ),
+                  layerPillsRight: rightPanelW + 28,
+                  layerPillsTop: 74,
+                  headerOverlay: mapOverlayHeader,
+                  onInspectLotDetails: (lot) =>
+                      _showLotDetails(context, ref, lot),
+                  onOpenLotBlueprint: (lotCode) {
+                    ref.read(selectedParkingLotProvider.notifier).state =
+                        lotCode;
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.parkingManagement;
+                  },
+                  panels: [
+                    bottomChartsRow,
+                    rightColumn,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  void _showLotDetails(
+  static AttemptDto? _pickFocusAttempt(Iterable<AttemptDto> attempts) {
+    if (attempts.isEmpty) return null;
+    for (final a in attempts) {
+      if (a.state == 'guard_review_required') return a;
+    }
+    for (final a in attempts) {
+      if (a.state == 'authorization_allowed') return a;
+    }
+    return attempts.first;
+  }
+
+  static void _showLotDetails(
     BuildContext context,
     WidgetRef ref,
     LotSummaryDto lot,
   ) {
     showDetailsSheet<void>(
       context,
+      frosted: true,
       title: 'Lot ${lot.lotCode} · ${lot.lotName}',
       subtitle: 'Near ${lot.nearestLandmark} · ${lot.totalSpaces} bays total',
       builder: (ctx) {
@@ -372,6 +349,7 @@ class OverviewScreen extends ConsumerWidget {
         FilledButton.icon(
           onPressed: () {
             Navigator.of(ctx).maybePop();
+            ref.read(selectedParkingLotProvider.notifier).state = lot.lotCode;
             ref.read(selectedDesktopTabProvider.notifier).state =
                 DesktopNavTab.parkingManagement;
           },
@@ -383,122 +361,656 @@ class OverviewScreen extends ConsumerWidget {
   }
 }
 
-class _LotSummaryRow extends StatelessWidget {
-  final LotSummaryDto lot;
-  final VoidCallback onTap;
+// ---------------------------------------------------------------------------
+// Compact / Narrow Viewport Fallback (< 1020px or height < 640px)
+// ---------------------------------------------------------------------------
 
-  const _LotSummaryRow({
-    required this.lot,
-    required this.onTap,
+class _CompactSpatialOverview extends ConsumerWidget {
+  final dynamic sysState;
+  final dynamic kpis;
+  final List<LotSummaryDto> lotSummaries;
+  final bool hasLiveSnapshot;
+  final bool awaitingLotTelemetry;
+  final bool isRealMode;
+  final AttemptDto? activeAttempt;
+  final double occupancyRatio;
+  final ValueChanged<LotSummaryDto> onInspectLot;
+
+  const _CompactSpatialOverview({
+    required this.sysState,
+    required this.kpis,
+    required this.lotSummaries,
+    required this.hasLiveSnapshot,
+    required this.awaitingLotTelemetry,
+    required this.isRealMode,
+    required this.activeAttempt,
+    required this.occupancyRatio,
+    required this.onInspectLot,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = SentryPalette.of(context);
+    return ScreenScaffold(
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _FloatingSearchPill(onTap: () => showCommandPalette(context, ref)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (isRealMode)
+                  OutlinedButton.icon(
+                    key: const Key('overview_retry_button'),
+                    onPressed: () {
+                      ref
+                          .read(sentryScenarioProvider.notifier)
+                          .refreshRealSnapshot();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                const ExportReportMenuButton(
+                  buttonKey: Key('overview_export_report_button'),
+                  defaultScope: ReportExportScope.parkingUtilization,
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.parkingManagement;
+                  },
+                  icon: const Icon(Icons.local_parking_rounded, size: 18),
+                  label: const Text('Parking map'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (isRealMode && sysState.lastRealApiError != null) ...[
+          const SizedBox(height: 14),
+          Callout(
+            tone: PillTone.warn,
+            icon: Icons.cloud_off_rounded,
+            title: 'FastAPI backend unreachable',
+            message:
+                '${sysState.lastRealApiError!.code}: ${sysState.lastRealApiError!.message}',
+          ),
+        ],
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 410,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: p.lotGround,
+                border: Border.all(color: p.line),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: CampusTacticalMap(
+                lotSummaries: lotSummaries,
+                allSpaces: sysState.spaces as List<SpaceDto>,
+                awaitingTelemetry: awaitingLotTelemetry,
+                compact: true,
+                layerPillsTop: 14,
+                playInsets: const EdgeInsets.fromLTRB(16, 68, 16, 22),
+                onInspectLotDetails: onInspectLot,
+                onOpenLotBlueprint: (lotCode) {
+                  ref.read(selectedParkingLotProvider.notifier).state = lotCode;
+                  ref.read(selectedDesktopTabProvider.notifier).state =
+                      DesktopNavTab.parkingManagement;
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _CampusOverviewBentoPanel(
+          kpis: kpis,
+          activeLanesCount: (sysState.activeLaneAttempts as Map).length,
+          hasLiveSnapshot: hasLiveSnapshot,
+          awaitingLotTelemetry: awaitingLotTelemetry,
+          occupancyRatio: occupancyRatio,
+        ),
+        const SizedBox(height: 16),
+        CampusMixDonutCard(
+          lotSummaries: lotSummaries,
+          spaces: sysState.spaces as List<SpaceDto>,
+          hasLiveSnapshot:
+              !awaitingLotTelemetry && (sysState.spaces as List).isNotEmpty,
+          onOpenParking: () {
+            ref.read(selectedDesktopTabProvider.notifier).state =
+                DesktopNavTab.parkingManagement;
+          },
+        ),
+        const SizedBox(height: 16),
+        GateActivityBarChartCard(
+          visits: sysState.visits,
+          attemptHistory: sysState.attemptHistory,
+          hasLiveSnapshot: hasLiveSnapshot,
+        ),
+        const SizedBox(height: 16),
+        _ActiveGateEncounterCard(
+          attempt: activeAttempt,
+          hasLiveSnapshot: hasLiveSnapshot,
+          onJumpToGate: (laneId) {
+            if (laneId != null) {
+              ref.read(focusedLaneProvider.notifier).state = laneId;
+            }
+            ref.read(selectedDesktopTabProvider.notifier).state =
+                DesktopNavTab.liveGateMonitoring;
+          },
+        ),
+        const SizedBox(height: 16),
+        _RecentActivityGlassCard(
+          events: sysState.recentActivityFeed as List<String>,
+          onlineDevices: kpis.onlineDevicesCount as int,
+          totalDevices: kpis.totalDevicesCount as int,
+          onViewAll: () {
+            ref.read(selectedDesktopTabProvider.notifier).state =
+                DesktopNavTab.accessLogs;
+          },
+          onInspectDevices: () {
+            ref.read(selectedDesktopTabProvider.notifier).state =
+                DesktopNavTab.deviceMonitoring;
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Top-left Search Bar & Frosted Glass Action Pill
+// ---------------------------------------------------------------------------
+
+class _FloatingSearchPill extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FloatingSearchPill({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        key: const Key('overview_floating_search_bar'),
+        onTap: onTap,
+        child: SpatialGlass(
+          strong: true,
+          radius: 999,
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_rounded, size: 18, color: p.crimson),
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 230),
+                child: Text(
+                  'Search lot, bay, plate, or driver...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: SentryTheme.sansFontFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: p.slate,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: p.subtle,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: p.line),
+                ),
+                child: Text(
+                  'Ctrl+K',
+                  style: SentryTheme.mono(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: p.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _GlassActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    final free = (lot.physicalAvailable - lot.allocationHeld)
-        .clamp(0, lot.totalSpaces);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: SpatialGlass(
+          strong: true,
+          radius: 999,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: p.text),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: SentryTheme.sansFontFamily,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: p.text,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    return SentryCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      radius: 16,
-      color: p.subtle,
-      accent: lot.conflictCount > 0
-          ? p.err
-          : lot.cameraStale
-              ? p.warn
-              : null,
+// ---------------------------------------------------------------------------
+// Card A — Campus Overview 2×2 Micro-Cards (Vinora "Vintage Overview" style)
+// ---------------------------------------------------------------------------
+
+class _CampusOverviewBentoPanel extends ConsumerWidget {
+  final dynamic kpis;
+  final int activeLanesCount;
+  final bool hasLiveSnapshot;
+  final bool awaitingLotTelemetry;
+  final double occupancyRatio;
+
+  const _CampusOverviewBentoPanel({
+    required this.kpis,
+    required this.activeLanesCount,
+    required this.hasLiveSnapshot,
+    required this.awaitingLotTelemetry,
+    required this.occupancyRatio,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = SentryPalette.of(context);
+    final entries = kpis.entriesTodayCount as int;
+    final exits = kpis.exitsTodayCount as int;
+    final inside = kpis.activeVisitsCount as int;
+    final holds = kpis.activeHoldsAwaitingPassageCount as int;
+    final reviews = kpis.pendingGuardReviewsCount as int;
+
+    return SpatialGlass(
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: SentryColors.crimson,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Text(
-                  lot.lotCode,
-                  style: SentryTheme.display(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lot.lotName,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Near ${lot.nearestLandmark}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: Text(
+                  'Campus overview',
+                  style: panelTitleStyle(p, size: 20),
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$free / ${lot.totalSpaces} free',
-                        style: SentryTheme.mono(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: p.text,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 18, color: p.muted),
-                    ],
-                  ),
-                  if (lot.conflictCount > 0) ...[
-                    const SizedBox(height: 4),
-                    StatusPill(
-                      label: '${lot.conflictCount} conflict',
-                      tone: PillTone.err,
-                      icon: Icons.report_problem_outlined,
-                    ),
-                  ] else if (lot.cameraStale) ...[
-                    const SizedBox(height: 4),
-                    const StatusPill(
-                      label: 'Camera stale',
-                      tone: PillTone.warn,
-                      icon: Icons.videocam_off_outlined,
-                    ),
-                  ],
-                ],
+              GlassIconButton(
+                icon: Icons.north_east_rounded,
+                tooltip: 'Open parking map',
+                onPressed: () {
+                  ref.read(selectedDesktopTabProvider.notifier).state =
+                      DesktopNavTab.parkingManagement;
+                },
+                size: 34,
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          CapacityBar(
-            segments: [
-              CapacitySegment(free, p.ok, 'free'),
-              CapacitySegment(lot.physicalOccupied, p.crimson, 'occupied'),
-              CapacitySegment(lot.allocationHeld, p.warn, 'held'),
-              CapacitySegment(
-                  lot.physicalUnknownOrStale, p.muted, 'unknown/stale'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GlassTile(
+                  height: 132,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  onTap: () {
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.accessLogs;
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Confirmed inside',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tileLabelStyle(p),
+                            ),
+                          ),
+                          Icon(Icons.directions_car_filled_outlined,
+                              size: 16, color: p.muted),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: BigFigure(
+                              value: hasLiveSnapshot
+                                  ? AnimatedCount(
+                                      value: inside,
+                                      style: bigFigureStyle(p, size: 28),
+                                    )
+                                  : Text('—',
+                                      style: bigFigureStyle(p,
+                                          size: 28, color: p.muted)),
+                              unit: hasLiveSnapshot ? 'parked' : null,
+                            ),
+                          ),
+                          if (hasLiveSnapshot) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: SoftChip(
+                                  holds > 0 ? '$holds held' : 'Clear',
+                                  tone: holds > 0
+                                      ? SoftChipTone.warn
+                                      : SoftChipTone.ok,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const Spacer(),
+                      if (!hasLiveSnapshot)
+                        Text(
+                          'Awaiting backend connection',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontSize: 11),
+                        )
+                      else
+                        MiniSparkline(
+                          points: [
+                            1.0,
+                            (inside + 1).toDouble(),
+                            (entries + 1).toDouble(),
+                            (exits + inside + 2).toDouble(),
+                            (inside + holds + 2).toDouble(),
+                          ],
+                          color: SentryColors.crimson,
+                          active: true,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GlassTile(
+                  height: 132,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  onTap: () {
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.liveGateMonitoring;
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Active gate lanes',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tileLabelStyle(p),
+                            ),
+                          ),
+                          Icon(Icons.videocam_outlined,
+                              size: 16, color: p.muted),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: hasLiveSnapshot
+                                ? AnimatedCount(
+                                    value: activeLanesCount,
+                                    style: bigFigureStyle(p, size: 28),
+                                  )
+                                : Text('—',
+                                    style: bigFigureStyle(p,
+                                        size: 28, color: p.muted)),
+                          ),
+                          if (hasLiveSnapshot) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: SoftChip(
+                                  activeLanesCount > 0
+                                      ? '$activeLanesCount active'
+                                      : 'Standby',
+                                  tone: activeLanesCount > 0
+                                      ? SoftChipTone.ok
+                                      : SoftChipTone.neutral,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const Spacer(),
+                      if (!hasLiveSnapshot)
+                        Text(
+                          'Awaiting backend connection',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontSize: 11),
+                        )
+                      else
+                        LollipopStemMicroChart(
+                          values: [
+                            0.45,
+                            0.72,
+                            0.62,
+                            activeLanesCount > 0 ? 0.96 : 0.4,
+                            0.55,
+                            0.48,
+                          ],
+                          maxLabel: 'Max 4',
+                          accentColor: SentryColors.crimson,
+                          active: true,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: GlassTile(
+                  height: 132,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  onTap: () {
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.guardReviews;
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Pending reviews',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tileLabelStyle(p),
+                            ),
+                          ),
+                          Icon(Icons.fact_check_outlined,
+                              size: 16, color: p.muted),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: hasLiveSnapshot
+                                ? AnimatedCount(
+                                    value: reviews,
+                                    style: bigFigureStyle(p, size: 28),
+                                  )
+                                : Text('—',
+                                    style: bigFigureStyle(p,
+                                        size: 28, color: p.muted)),
+                          ),
+                          if (hasLiveSnapshot) ...[
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: SoftChip(
+                                  reviews > 0 ? 'Needs guard' : 'Clear',
+                                  tone: reviews > 0
+                                      ? SoftChipTone.warn
+                                      : SoftChipTone.ok,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const Spacer(),
+                      if (!hasLiveSnapshot)
+                        Text(
+                          'Awaiting backend connection',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontSize: 11),
+                        )
+                      else
+                        MiniSparkline(
+                          showDotGrid: true,
+                          points: [
+                            2.0,
+                            3.0,
+                            reviews + 2.0,
+                            (reviews + 1).toDouble(),
+                            reviews.toDouble(),
+                          ],
+                          color: reviews > 0 ? p.warn : p.ok,
+                          active: true,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GlassTile(
+                  height: 132,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  onTap: () {
+                    ref.read(selectedDesktopTabProvider.notifier).state =
+                        DesktopNavTab.parkingManagement;
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Campus capacity',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tileLabelStyle(p),
+                            ),
+                          ),
+                          Icon(Icons.donut_large_rounded,
+                              size: 16, color: p.muted),
+                        ],
+                      ),
+                      const Spacer(),
+                      if (!hasLiveSnapshot) ...[
+                        Center(
+                          child: Text(
+                            '—',
+                            style:
+                                bigFigureStyle(p, size: 28, color: p.muted),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Awaiting backend connection',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontSize: 11),
+                        ),
+                      ] else
+                        Center(
+                          child: CapacityRadialGauge(
+                            ratio: occupancyRatio,
+                            active: !awaitingLotTelemetry,
+                            activeColor: occupancyRatio > 0.85
+                                ? SentryColors.crimson
+                                : occupancyRatio > 0.65
+                                    ? p.warn
+                                    : SentryColors.crimson,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -507,34 +1019,258 @@ class _LotSummaryRow extends StatelessWidget {
   }
 }
 
-class _RecentActivityCard extends StatelessWidget {
-  final List<String> events;
-  final VoidCallback onViewAll;
+// ---------------------------------------------------------------------------
+// Card B — Active Gate Encounter (Vinora "Harvest order · Rows picked 3/4")
+// ---------------------------------------------------------------------------
 
-  const _RecentActivityCard({
-    required this.events,
-    required this.onViewAll,
+class _ActiveGateEncounterCard extends StatelessWidget {
+  final AttemptDto? attempt;
+  final bool hasLiveSnapshot;
+  final ValueChanged<String?> onJumpToGate;
+
+  const _ActiveGateEncounterCard({
+    required this.attempt,
+    required this.hasLiveSnapshot,
+    required this.onJumpToGate,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    return SentryCard(
-      padding: const EdgeInsets.all(24),
+    final a = attempt;
+
+    if (a == null) {
+      return SpatialGlass(
+        radius: 24,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: p.subtle,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.videocam_outlined, color: p.muted, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Active gate lane',
+                      style: panelTitleStyle(p, size: 16)),
+                  Text(
+                    hasLiveSnapshot
+                        ? 'All 4 gate lanes idle · monitoring'
+                        : 'Awaiting live gate feed',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            GlassIconButton(
+              icon: Icons.north_east_rounded,
+              tooltip: 'Inspect gate lanes',
+              onPressed: () => onJumpToGate(null),
+              size: 34,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final stage = a.currentStageNumber.clamp(1, 6);
+    final litSegments = (stage / 6 * 4).ceil().clamp(1, 4);
+    final pct = ((stage / 6) * 100).round();
+
+    return SpatialGlass(
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SectionHeader(
-            title: 'Recent gate activity',
-            trailing: TextButton(
-              onPressed: onViewAll,
-              child: const Text('All logs'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_humanLaneName(a.laneId)} · ${a.spaceCode ?? 'Gate check'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: SentryTheme.sansFontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: p.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        PlateBadge(
+                          plateText: a.plateText,
+                          rfidUid: a.rfidUid,
+                          isCompact: true,
+                        ),
+                        if (a.faceSimilarityScore != null)
+                          SoftChip(
+                            'ArcFace ${a.faceSimilarityScore!.toStringAsFixed(2)}',
+                            tone: SoftChipTone.neutral,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              GlassIconButton(
+                icon: Icons.videocam_outlined,
+                tooltip: 'Open in Live Gates',
+                onPressed: () => onJumpToGate(a.laneId),
+                size: 36,
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Verification stage $stage/6',
+                style: TextStyle(
+                  fontFamily: SentryTheme.sansFontFamily,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: p.slate,
+                ),
+              ),
+              Text(
+                '$pct%',
+                style: SentryTheme.mono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: p.text,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: AnimatedContainer(
+                    duration: SentryMotion.of(
+                        context, const Duration(milliseconds: 220)),
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: i < litSegments
+                          ? SentryColors.crimson
+                          : (p.isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : const Color(0xFF0F172A)
+                                  .withValues(alpha: 0.08)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _humanLaneName(String laneId) {
+    switch (laneId) {
+      case 'lane-car-in':
+        return 'North Car Entry';
+      case 'lane-car-out':
+        return 'North Car Exit';
+      case 'lane-moto-in':
+        return 'Motorcycle Entry';
+      case 'lane-moto-out':
+        return 'Motorcycle Exit';
+      default:
+        return laneId;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Card C — Recent Gate Activity (Vinora "Recent Messages" clean 2-line list)
+// ---------------------------------------------------------------------------
+
+class _RecentActivityGlassCard extends StatelessWidget {
+  final List<String> events;
+  final int onlineDevices;
+  final int totalDevices;
+  final VoidCallback onViewAll;
+  final VoidCallback onInspectDevices;
+
+  const _RecentActivityGlassCard({
+    required this.events,
+    required this.onlineDevices,
+    required this.totalDevices,
+    required this.onViewAll,
+    required this.onInspectDevices,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    final devicesHealthy = totalDevices > 0 && onlineDevices == totalDevices;
+
+    return SpatialGlass(
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Recent gate activity',
+                  style: panelTitleStyle(p, size: 17),
+                ),
+              ),
+              if (totalDevices > 0)
+                GestureDetector(
+                  onTap: onInspectDevices,
+                  child: SoftChip(
+                    '$onlineDevices/$totalDevices online',
+                    tone: devicesHealthy
+                        ? SoftChipTone.ok
+                        : SoftChipTone.warn,
+                  ),
+                ),
+              const SizedBox(width: 4),
+              TextButton(
+                onPressed: onViewAll,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 32),
+                ),
+                child: const Text('View all'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           if (events.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
+              padding: EdgeInsets.symmetric(vertical: 10),
               child: EmptyState(
                 icon: Icons.history_toggle_off_rounded,
                 title: 'No recent gate activity',
@@ -542,143 +1278,113 @@ class _RecentActivityCard extends StatelessWidget {
               ),
             )
           else
-            for (final msg in events.take(5))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ActivityRow(message: msg, palette: p),
-              ),
+            for (var i = 0; i < events.take(3).length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              _ReadableActivityTile(raw: events[i], palette: p),
+            ],
         ],
       ),
     );
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  final String message;
+class _ReadableActivityTile extends StatelessWidget {
+  final String raw;
   final SentryPalette palette;
-
-  const _ActivityRow({required this.message, required this.palette});
-
-  @override
-  Widget build(BuildContext context) {
-    final upper = message.toUpperCase();
-    final isBad = upper.contains('DENIED') ||
-        upper.contains('CONFLICT') ||
-        upper.contains('EXPIRED');
-    final isGood = upper.contains('CONFIRMED') || upper.contains('ALLOWED');
-    final color = isBad
-        ? palette.err
-        : isGood
-            ? palette.ok
-            : palette.warn;
-    final icon = isBad
-        ? Icons.block_rounded
-        : isGood
-            ? Icons.check_circle_outline_rounded
-            : Icons.sensors_rounded;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: palette.subtle,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 17, color: color),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: palette.text,
-                    fontWeight: FontWeight.w500,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DevicesCompactCard extends StatelessWidget {
-  final int onlineCount;
-  final int totalCount;
-  final VoidCallback onInspect;
-
-  const _DevicesCompactCard({
-    required this.onlineCount,
-    required this.totalCount,
-    required this.onInspect,
-  });
+  const _ReadableActivityTile({required this.raw, required this.palette});
 
   @override
   Widget build(BuildContext context) {
-    final hasDevices = totalCount > 0;
-    final allHealthy = hasDevices && onlineCount == totalCount;
-    return SentryCard(
-      onTap: onInspect,
-      padding: const EdgeInsets.all(22),
+    final parsed = _humanizeActivity(raw);
+    final (Color bg, Color fg, IconData icon) = switch (parsed.tone) {
+      SoftChipTone.ok => (palette.okTint, palette.ok, Icons.check_rounded),
+      SoftChipTone.warn => (
+          palette.warnTint,
+          palette.warnText,
+          Icons.visibility_outlined
+        ),
+      SoftChipTone.crimson => (
+          palette.errTint,
+          palette.errText,
+          Icons.warning_amber_rounded
+        ),
+      SoftChipTone.neutral => (palette.subtle, palette.slate, Icons.sensors_rounded),
+    };
+
+    return GlassTile(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: !hasDevices
-                  ? SentryPalette.of(context).subtle
-                  : (allHealthy
-                      ? SentryPalette.of(context).okTint
-                      : SentryPalette.of(context).warnTint),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              Icons.router_outlined,
-              color: !hasDevices
-                  ? SentryPalette.of(context).muted
-                  : (allHealthy
-                      ? SentryPalette.of(context).ok
-                      : SentryPalette.of(context).warn),
-            ),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, size: 17, color: fg),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasDevices
-                      ? '$onlineCount of $totalCount site devices online'
-                      : 'Awaiting device telemetry',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  parsed.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: SentryTheme.sansFontFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: palette.text,
+                  ),
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  !hasDevices
-                      ? 'No devices currently connected to backend'
-                      : (allHealthy
-                          ? 'All cameras and RFID readers responding'
-                          : '${totalCount - onlineCount} device needs attention'),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  parsed.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: SentryTheme.sansFontFamily,
+                    fontSize: 12,
+                    color: palette.muted,
+                  ),
                 ),
               ],
             ),
           ),
-          StatusPill(
-            label: !hasDevices
-                ? 'Awaiting'
-                : (allHealthy ? 'All online' : 'Check devices'),
-            tone: !hasDevices
-                ? PillTone.neutral
-                : (allHealthy ? PillTone.ok : PillTone.warn),
+          const SizedBox(width: 6),
+          Text(
+            'PHT',
+            style: SentryTheme.mono(fontSize: 10.5, color: palette.muted),
           ),
         ],
       ),
+    );
+  }
+
+  static ({String title, String subtitle, SoftChipTone tone}) _humanizeActivity(
+      String msg) {
+    final upper = msg.toUpperCase();
+    final parts = msg.split(':');
+    final source = parts.length > 1 ? parts.first.trim() : 'Gate event';
+    final detail = parts.length > 1 ? parts.sublist(1).join(':').trim() : msg;
+
+    final tone = (upper.contains('DENIED') ||
+            upper.contains('CONFLICT') ||
+            upper.contains('EXPIRED'))
+        ? SoftChipTone.crimson
+        : (upper.contains('CONFIRMED') || upper.contains('ALLOWED'))
+            ? SoftChipTone.ok
+            : SoftChipTone.warn;
+
+    String cleanSource = source
+        .replaceAll('GATE-NORTH/CAR-IN', 'North Car Entry')
+        .replaceAll('GATE-NORTH/MOTO-IN', 'Motorcycle Entry')
+        .replaceAll('GATE-NORTH/CAR-OUT', 'North Car Exit')
+        .replaceAll('LOT B1 OVERHEAD CAM', 'Lot B1 Camera');
+
+    return (
+      title: detail,
+      subtitle: cleanSource,
+      tone: tone,
     );
   }
 }
