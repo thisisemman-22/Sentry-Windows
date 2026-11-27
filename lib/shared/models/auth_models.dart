@@ -74,6 +74,7 @@ enum UserRole {
     }
   }
 
+  bool get isGuard => this == UserRole.guard;
   bool get isAdmin => this == UserRole.administrator;
   bool get isGuardOrAdmin =>
       this == UserRole.guard || this == UserRole.administrator;

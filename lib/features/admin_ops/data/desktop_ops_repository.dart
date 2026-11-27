@@ -41,10 +41,20 @@ abstract class DesktopOpsRepository {
     String? rejectionReason,
   });
 
+  Future<ApiEnvelope<GuestPassLookupDto>> lookupGuestGatePass({
+    required String passCode,
+  });
+  Future<ApiEnvelope<GuestGateVerificationResultDto>> confirmGuestGatePass({
+    required String passCode,
+    required String laneId,
+  });
   Future<ApiEnvelope<GuestGateVerificationResultDto>> verifyGuestGatePass({
     required String passCode,
     required String laneId,
   });
+  Future<ApiEnvelope<ManualGuestEntryDto>> recordManualGuestEntry(
+    ManualGuestEntryDto entry,
+  );
 
   Future<ApiEnvelope<List<AnnouncementDto>>> fetchAnnouncements();
   Future<ApiEnvelope<AnnouncementDto>> saveAnnouncement(AnnouncementDto item);
@@ -231,6 +241,36 @@ class RealDesktopOpsRepository implements DesktopOpsRepository {
   }
 
   @override
+  Future<ApiEnvelope<GuestPassLookupDto>> lookupGuestGatePass({
+    required String passCode,
+  }) {
+    // TODO(API): confirm POST /api/v1/gate/guest-passes/lookup
+    return apiClient.post<GuestPassLookupDto>(
+      '/api/v1/gate/guest-passes/lookup',
+      body: {'pass_code': passCode},
+      parser: (json) =>
+          GuestPassLookupDto.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  @override
+  Future<ApiEnvelope<GuestGateVerificationResultDto>> confirmGuestGatePass({
+    required String passCode,
+    required String laneId,
+  }) {
+    // TODO(API): confirm POST /api/v1/gate/guest-passes/confirm
+    return apiClient.post<GuestGateVerificationResultDto>(
+      '/api/v1/gate/guest-passes/confirm',
+      body: {
+        'pass_code': passCode,
+        'lane_id': laneId,
+      },
+      parser: (json) =>
+          GuestGateVerificationResultDto.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  @override
   Future<ApiEnvelope<GuestGateVerificationResultDto>> verifyGuestGatePass({
     required String passCode,
     required String laneId,
@@ -244,6 +284,19 @@ class RealDesktopOpsRepository implements DesktopOpsRepository {
       },
       parser: (json) =>
           GuestGateVerificationResultDto.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  @override
+  Future<ApiEnvelope<ManualGuestEntryDto>> recordManualGuestEntry(
+    ManualGuestEntryDto entry,
+  ) {
+    // TODO(API): confirm POST /api/v1/gate/manual-entries
+    return apiClient.post<ManualGuestEntryDto>(
+      '/api/v1/gate/manual-entries',
+      body: entry.toJson(),
+      parser: (json) =>
+          ManualGuestEntryDto.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -481,6 +534,40 @@ class MockDesktopOpsData {
         vehicleType: 'car',
         plateNumber: 'NBB 118',
         status: 'approved',
+      ),
+      GuestVisitRequestDto(
+        visitRequestId: 'GV-204',
+        guestAccountId: 'GA-104',
+        guestFullName: 'Engr. Maria Clara Santos',
+        guestEmail: 'mc.santos@industry.example',
+        hostName: "CEAFA Dean's Office",
+        hostDepartment: 'CEAFA',
+        purpose: 'Industry Advisory Review',
+        visitDateUtc: todayStart,
+        windowStartUtc: now.subtract(const Duration(minutes: 45)),
+        windowEndUtc: now.add(const Duration(hours: 3)),
+        vehicleType: 'car',
+        plateNumber: 'NGA 8821',
+        status: 'approved',
+      ),
+      GuestVisitRequestDto(
+        visitRequestId: 'GV-205',
+        guestAccountId: 'GA-105',
+        guestFullName: 'Engr. Noel Villanueva',
+        guestEmail: 'n.villanueva@vendor.example',
+        hostName: 'ICT Services',
+        hostDepartment: 'ICT',
+        purpose: 'Network Rack Audit',
+        visitDateUtc: todayStart,
+        windowStartUtc: now.subtract(const Duration(hours: 6)),
+        windowEndUtc:
+            now.subtract(const Duration(hours: 2, minutes: 15)),
+        vehicleType: 'car',
+        plateNumber: 'NQZ 314',
+        status: 'approved',
+        isCurrentlyInside: true,
+        checkedInAtUtc:
+            now.subtract(const Duration(hours: 5, minutes: 50)),
       ),
     ];
   }

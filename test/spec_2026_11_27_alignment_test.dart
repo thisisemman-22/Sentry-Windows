@@ -79,12 +79,12 @@ void main() {
         );
         await tapKey(tester, 'first_login_submit_button');
         expect(find.byType(DesktopShell), findsOneWidget);
-        expect(find.text('Campus overview'), findsOneWidget);
+        expect(find.text('Review Queue'), findsAtLeastNWidgets(1));
       },
     );
 
     testWidgets(
-      'Guard RBAC isolation: sees only Dashboard/Parking/Monitoring/Reports and gets 403 on admin mutations',
+      'Guard RBAC isolation: sees only 5 Guard screens and gets 403 on admin mutations',
       (tester) async {
         tester.view.physicalSize = const Size(1600, 960);
         tester.view.devicePixelRatio = 1.0;
@@ -105,39 +105,28 @@ void main() {
         await tapKey(tester, 'login_submit_button');
 
         for (final key in const [
-          'nav_tab_dashboard',
-          'nav_tab_parking',
-          'nav_tab_monitoring',
-          'nav_tab_reports',
+          'nav_tab_guardReviewQueue',
+          'nav_tab_guardMonitor',
+          'nav_tab_guardGuestCheck',
+          'nav_tab_guardManualEntry',
+          'nav_tab_guardOverdueGuests',
         ]) {
           expect(find.byKey(Key(key)), findsOneWidget);
         }
         for (final adminKey in const [
+          'nav_tab_dashboard',
           'nav_tab_users',
           'nav_tab_vehiclesRfid',
+          'nav_tab_parking',
           'nav_tab_guests',
+          'nav_tab_monitoring',
+          'nav_tab_reports',
           'nav_tab_announcements',
           'nav_tab_audit',
           'nav_tab_settings',
         ]) {
           expect(find.byKey(Key(adminKey)), findsNothing);
         }
-
-        // Monitoring Guard sees 0..3 ONLY (never 4 = Guard Accounts)
-        await tapKey(tester, 'nav_tab_monitoring');
-        for (var i = 0; i < 4; i++) {
-          expect(find.byKey(Key('monitoring_subtab_$i')), findsOneWidget);
-        }
-        expect(find.byKey(const Key('monitoring_subtab_4')), findsNothing);
-
-        // Reports Guard sees ONLY Occupancy, Entries & Exits, Review Cases
-        await tapKey(tester, 'nav_tab_reports');
-        expect(find.byKey(const Key('report_preset_occupancy')), findsOneWidget);
-        expect(find.byKey(const Key('report_preset_entries_exits')), findsOneWidget);
-        expect(find.byKey(const Key('report_preset_review_cases')), findsOneWidget);
-        expect(find.byKey(const Key('report_preset_vehicles')), findsNothing);
-        expect(find.byKey(const Key('report_preset_users')), findsNothing);
-        expect(find.byKey(const Key('report_preset_guests')), findsNothing);
 
         // Controller & simulator reject Guard mutations with HTTP 403
         final container = ProviderScope.containerOf(

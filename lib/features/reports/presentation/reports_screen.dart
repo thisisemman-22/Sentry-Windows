@@ -41,6 +41,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final p = SentryPalette.of(context);
     final profile = ref.watch(authControllerProvider).profile;
     final isAdmin = profile?.role.isAdmin ?? false;
+    if (!isAdmin) {
+      return const ScreenScaffold(
+        children: [
+          RoleRestrictedPanel(
+            featureName: 'Reports & Exports',
+            minimumRole: 'administrator',
+          ),
+        ],
+      );
+    }
     final sysState = ref.watch(sentryScenarioProvider);
     final ops = ref.watch(desktopOpsControllerProvider);
 

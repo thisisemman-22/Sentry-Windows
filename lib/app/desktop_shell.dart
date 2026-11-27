@@ -70,11 +70,12 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final p = SentryPalette.of(context);
     final activeTab = ref.watch(selectedDesktopTabProvider);
     final collapsed = ref.watch(sidebarCollapsedProvider);
-    final isAdmin =
-        ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
+    final role = ref.watch(authControllerProvider).role;
     final visibleTabs = DesktopNavTab.values
-        .where((t) => isAdmin || !t.isAdminOnly)
+        .where((t) => t.isVisibleFor(role))
         .toList();
+    final effectiveTab =
+        visibleTabs.contains(activeTab) ? activeTab : visibleTabs.first;
 
     // Surface simulator / action feedback as a toast instead of a banner strip.
     ref.listen(sentryScenarioProvider.select((s) => s.lastActionBanner),
@@ -121,7 +122,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       ): _unlockDevMode,
     };
 
-    final forward = activeTab.index >= _previousTab.index;
+    final forward = effectiveTab.index >= _previousTab.index;
     final isMobile = MediaQuery.sizeOf(context).width < 760;
 
     // Fast, calm view transition: 220ms fade + 1.5% horizontal slide.
@@ -144,10 +145,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
         children: [...previous, if (current != null) current],
       ),
       child: KeyedSubtree(
-        key: ValueKey(activeTab),
+        key: ValueKey(effectiveTab),
         child: ColoredBox(
           color: p.bg,
-          child: DesktopViewRouter(tab: activeTab),
+          child: DesktopViewRouter(tab: effectiveTab),
         ),
       ),
     );
@@ -166,7 +167,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                     child: _Sidebar(
                       collapsed: false,
                       floating: false,
-                      activeTab: activeTab,
+                      activeTab: effectiveTab,
                       onToggleTheme: _toggleTheme,
                       onSelect: (tab) {
                         Navigator.of(context).maybePop();
@@ -178,8 +179,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               : null,
           bottomNavigationBar: isMobile
               ? Builder(builder: (context) {
-                  final mobileTabs = visibleTabs.take(4).toList();
-                  final idx = mobileTabs.indexOf(activeTab);
+                  final mobileTabs = visibleTabs.take(5).toList();
+                  final idx = mobileTabs.indexOf(effectiveTab);
                   return NavigationBar(
                     backgroundColor: p.card,
                     selectedIndex: idx >= 0 ? idx : 0,
@@ -203,7 +204,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                   _Sidebar(
                     collapsed: collapsed,
                     floating: true,
-                    activeTab: activeTab,
+                    activeTab: effectiveTab,
                     onToggleTheme: _toggleTheme,
                     onSelect: _go,
                   ),
@@ -255,10 +256,12 @@ class _Sidebar extends ConsumerWidget {
     final profile = authState.profile;
     if (profile == null) return const SizedBox.shrink();
     final visibleTabs = DesktopNavTab.values
-        .where((t) => profile.role.isAdmin || !t.isAdminOnly)
+        .where((t) => t.isVisibleFor(profile.role))
         .toList();
     final kpis = ref.watch(
         sentryScenarioProvider.select((s) => s.computeDashboardKpis()));
+    final overdueGuestCount = ref.watch(desktopOpsControllerProvider.select(
+        (o) => o.guestVisitRequests.where((g) => g.isOverdue()).length));
     final width = collapsed ? 84.0 : 252.0;
     final railColor =
         floating && p.isDark ? const Color(0xEB121215) : p.card;
@@ -338,33 +341,41 @@ class _Sidebar extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final tab in visibleTabs) ...[
-                          if (_sectionLabelFor(tab,
+                        for (var i = 0; i < visibleTabs.length; i++) ...[
+                          if (_sectionLabelFor(visibleTabs[i],
                                   isAdmin: profile.role.isAdmin) !=
                               null)
                             _NavSectionLabel(
                               label: _sectionLabelFor(
-                                tab,
+                                visibleTabs[i],
                                 isAdmin: profile.role.isAdmin,
                               )!,
                               collapsed: collapsed,
                             ),
                           _NavItem(
-                            key: Key('nav_tab_${tab.name}'),
-                            tab: tab,
-                            selected: tab == activeTab,
+                            key: Key('nav_tab_${visibleTabs[i].name}'),
+                            tab: visibleTabs[i],
+                            shortcutNumber: i + 1,
+                            selected: visibleTabs[i] == activeTab,
                             collapsed: collapsed,
                             locked: false,
-                            badge: switch (tab) {
+                            badge: switch (visibleTabs[i]) {
                               DesktopNavTab.monitoring =>
                                 kpis.activeHoldsAwaitingPassageCount +
                                     kpis.pendingGuardReviewsCount,
+                              DesktopNavTab.guardReviewQueue =>
+                                kpis.pendingGuardReviewsCount,
+                              DesktopNavTab.guardOverdueGuests =>
+                                overdueGuestCount,
                               _ => 0,
                             },
-                            badgeTone: kpis.pendingGuardReviewsCount > 0
-                                ? PillTone.err
-                                : PillTone.warn,
-                            onTap: () => onSelect(tab),
+                            badgeTone: visibleTabs[i] ==
+                                    DesktopNavTab.guardOverdueGuests
+                                ? PillTone.warn
+                                : (kpis.pendingGuardReviewsCount > 0
+                                    ? PillTone.err
+                                    : PillTone.warn),
+                            onTap: () => onSelect(visibleTabs[i]),
                           ),
                         ],
                       ],
@@ -524,14 +535,15 @@ class _Sidebar extends ConsumerWidget {
   }
 }
 
-String? _sectionLabelFor(DesktopNavTab tab, {required bool isAdmin}) =>
-    switch (tab) {
-      DesktopNavTab.dashboard => 'OPERATIONS',
-      DesktopNavTab.users => isAdmin ? 'DIRECTORY & FLEET' : null,
-      DesktopNavTab.parking => isAdmin ? null : 'FACILITIES & REPORTS',
-      DesktopNavTab.announcements => isAdmin ? 'SYSTEM' : null,
-      _ => null,
-    };
+String? _sectionLabelFor(DesktopNavTab tab, {required bool isAdmin}) {
+  if (!isAdmin) return null;
+  return switch (tab) {
+    DesktopNavTab.dashboard => 'OPERATIONS',
+    DesktopNavTab.users => 'DIRECTORY & FLEET',
+    DesktopNavTab.announcements => 'SYSTEM',
+    _ => null,
+  };
+}
 
 class _NavSectionLabel extends StatelessWidget {
   final String label;
@@ -582,14 +594,15 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     final sys = ref.watch(sentryScenarioProvider);
-    final isAdmin =
-        ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
+    final role = ref.watch(authControllerProvider).role;
+    final isAdmin = role.isAdmin;
     final q = _q.trim().toUpperCase();
-    final views = DesktopNavTab.values
-        .where((t) => isAdmin || !t.isAdminOnly)
+    final visibleRoleTabs =
+        DesktopNavTab.values.where((t) => t.isVisibleFor(role)).toList();
+    final views = visibleRoleTabs
         .where((t) => q.isEmpty || t.title.toUpperCase().contains(q))
         .toList();
-    final people = q.isEmpty
+    final people = (!isAdmin || q.isEmpty)
         ? const []
         : sys.participantDirectory.where((u) {
             final plates = u.vehicles
@@ -645,7 +658,8 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
                       title: Text(t.title),
                       subtitle: Text(t.subtitle,
                           maxLines: 1, overflow: TextOverflow.ellipsis),
-                      trailing: Text('Ctrl+${t.index + 1}',
+                      trailing: Text(
+                          'Ctrl+${visibleRoleTabs.indexOf(t) + 1}',
                           style: SentryTheme.mono(fontSize: 12, color: p.muted)),
                       onTap: () => go(t),
                     ),
@@ -685,6 +699,7 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
 
 class _NavItem extends StatefulWidget {
   final DesktopNavTab tab;
+  final int shortcutNumber;
   final bool selected;
   final bool collapsed;
   final bool locked;
@@ -695,6 +710,7 @@ class _NavItem extends StatefulWidget {
   const _NavItem({
     required Key super.key,
     required this.tab,
+    required this.shortcutNumber,
     required this.selected,
     required this.collapsed,
     required this.locked,
@@ -718,7 +734,7 @@ class _NavItemState extends State<_NavItem> {
         p.isDark ? SentryColors.crimsonDarkAccent : SentryColors.crimson;
     final iconColor = sel ? activeCrimson : (_hover ? p.text : p.slate);
     final textColor = sel ? p.text : (_hover ? p.text : p.slate);
-    final shortcut = 'Ctrl+${widget.tab.index + 1}';
+    final shortcut = 'Ctrl+${widget.shortcutNumber}';
     final t = ToneColors.of(context, widget.badgeTone);
 
     final badge = widget.badge > 0
@@ -1078,7 +1094,12 @@ class _TopBar extends ConsumerWidget {
     final ws = ref.watch(sentryScenarioProvider.select((s) => s.wsState));
     final config = ref.watch(appConfigProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final activeTab = ref.watch(selectedDesktopTabProvider);
+    final role = ref.watch(authControllerProvider).role;
+    final visibleTabs = DesktopNavTab.values
+        .where((t) => t.isVisibleFor(role))
+        .toList();
+    final rawTab = ref.watch(selectedDesktopTabProvider);
+    final activeTab = visibleTabs.contains(rawTab) ? rawTab : visibleTabs.first;
     final wide = MediaQuery.sizeOf(context).width >= 1180;
 
     return Container(

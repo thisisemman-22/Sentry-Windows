@@ -93,6 +93,8 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     final sysState = ref.watch(sentryScenarioProvider);
+    final role = ref.watch(authControllerProvider).role;
+    final isGuard = role.isGuard;
 
     final filteredQueue = sysState.reviewQueue.where((item) {
       if (_filterIndex == 1) return !item.isResolved;
@@ -108,16 +110,25 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
     if (selectedItem != null) {
       _capturedExpectedVersion ??= selectedItem.currentAttemptVersion;
     }
-    final canApprove =
-        selectedItem != null && selectedItem.canApprove() && !_isSubmittingReview;
+    final canApprove = isGuard &&
+        selectedItem != null &&
+        selectedItem.canApprove() &&
+        !_isSubmittingReview;
 
     return ScreenScaffold(
       children: [
         PageIntro(
-          title: 'Guard reviews',
+          title: isGuard ? 'Review Queue' : 'Guard reviews',
           subtitle:
-              'Cases where the camera or reader needed a human check before allowing entry.',
+              'Unresolved cases needing a check: unmatched plates, face issues, Lot B5 exits, and guest plate mismatches.',
           actions: [
+            if (!isGuard)
+              const StatusPill(
+                key: Key('resolved_by_guards_badge'),
+                label: 'Resolved by Guards',
+                icon: Icons.shield_outlined,
+                tone: PillTone.neutral,
+              ),
             SegmentTabs(
               labels: [
                 'All (${sysState.reviewQueue.length})',
@@ -178,12 +189,13 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                   )
                 : SmoothSwitcher(
                     switchKey:
-                        '${selectedItem.reviewCaseId}-${selectedItem.currentAttemptVersion}-${selectedItem.isResolved}',
+                        '${selectedItem.reviewCaseId}-${selectedItem.currentAttemptVersion}-${selectedItem.isResolved}-$isGuard',
                     child: _buildInspectorCard(
                       context,
                       p,
                       selectedItem,
                       canApprove,
+                      isGuard: isGuard,
                     ),
                   );
 
@@ -215,8 +227,9 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
     BuildContext context,
     SentryPalette p,
     GuardReviewQueueItem selectedItem,
-    bool canApprove,
-  ) {
+    bool canApprove, {
+    required bool isGuard,
+  }) {
     final participant =
         SentryFixtures.findParticipantByCode(selectedItem.userCode);
     final rosterMode =
@@ -361,13 +374,17 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
           const SizedBox(height: 20),
 
           Text(
-            'Guard note (10–500 characters)',
+            isGuard
+                ? 'Guard note (10–500 characters)'
+                : 'Guard note (read-only — resolved by Guards)',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 8),
           TextField(
             key: const Key('guard_review_reason_field'),
             controller: _reasonCtrl,
+            enabled: isGuard,
+            readOnly: !isGuard,
             maxLines: 2,
             decoration: const InputDecoration(
               hintText: 'Describe how you verified the driver and vehicle…',
@@ -432,10 +449,11 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FilledButton.icon(
                 key: const Key('guard_review_approve_button'),
-                onPressed: canApprove
+                onPressed: isGuard && canApprove
                     ? () => _submitReviewAction(selectedItem, 'approve')
                     : null,
                 icon: const Icon(Icons.check_rounded, size: 18),
@@ -443,24 +461,33 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
               ),
               OutlinedButton.icon(
                 key: const Key('guard_review_deny_button'),
-                onPressed: selectedItem.isResolved || _isSubmittingReview
-                    ? null
-                    : () => _submitReviewAction(selectedItem, 'deny'),
+                onPressed:
+                    !isGuard || selectedItem.isResolved || _isSubmittingReview
+                        ? null
+                        : () => _submitReviewAction(selectedItem, 'deny'),
                 icon: const Icon(Icons.block_outlined, size: 18),
                 label: const Text('Deny entry'),
               ),
               OutlinedButton.icon(
                 key: const Key('guard_review_escalate_button'),
-                onPressed: selectedItem.isResolved || _isSubmittingReview
-                    ? null
-                    : () => _submitReviewAction(selectedItem, 'escalate'),
+                onPressed:
+                    !isGuard || selectedItem.isResolved || _isSubmittingReview
+                        ? null
+                        : () => _submitReviewAction(selectedItem, 'escalate'),
                 icon: const Icon(Icons.flag_outlined, size: 18),
                 label: const Text('Escalate'),
               ),
+              if (!isGuard)
+                const StatusPill(
+                  label: 'Read-only · Resolved by Guards',
+                  icon: Icons.visibility_outlined,
+                  tone: PillTone.neutral,
+                ),
             ],
           ),
 
-          if (selectedItem.isResolved &&
+          if (isGuard &&
+              selectedItem.isResolved &&
               selectedItem.resolvedAction == 'approve') ...[
             const SizedBox(height: 20),
             Callout(
@@ -485,9 +512,8 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                             'Confirmed physical crossing after Guard Review approval (${selectedItem.reviewCaseId}).',
                         actor: actor,
                       );
-                  ref.read(monitoringSubTabProvider.notifier).state = 0;
                   ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.monitoring;
+                      DesktopNavTab.guardMonitor;
                 },
                 icon: const Icon(Icons.check_circle_rounded, size: 18),
                 label: const Text('Confirm crossed'),
@@ -555,6 +581,12 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
     switch (code) {
       case 'IDENTITY_UNCERTAIN':
         return 'Uncertain plate or face read';
+      case 'UNMATCHED_PLATE':
+        return 'Unmatched plate read';
+      case 'LOT_B5_OVERFLOW_EXIT':
+        return 'Car leaving Lot B5 (Overflow)';
+      case 'GUEST_PLATE_MISMATCH':
+        return 'Guest plate mismatch / shared plate';
       case 'OCCUPANCY_CONFLICT':
         return 'Bay occupancy conflict';
       case 'IDENTITY_MISMATCH':

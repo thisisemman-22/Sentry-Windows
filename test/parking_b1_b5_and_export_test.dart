@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:campus_parking_desktop/app/app.dart';
+import 'package:campus_parking_desktop/app/desktop_shell.dart';
 import 'package:campus_parking_desktop/app/providers.dart';
 import 'package:campus_parking_desktop/core/config/app_config.dart';
 import 'package:campus_parking_desktop/core/config/roster_mode.dart';
@@ -161,6 +163,8 @@ void main() {
       );
       await pumpFrameSettle(tester);
 
+      await tester.tap(find.byKey(const Key('persona_admin_chip')));
+      await pumpFrameSettle(tester);
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await pumpFrameSettle(tester);
 
@@ -345,13 +349,17 @@ void main() {
       );
       await pumpFrameSettle(tester);
 
-      // 1. Guard signs in -> Export from Overview -> Audit Logs hidden -> saves CSV
+      // 1. Guard signs in -> open Export dialog -> Audit Logs hidden -> saves CSV
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await pumpFrameSettle(tester);
 
-      await tester.tap(find.byKey(const Key('overview_export_report_button')));
-      await pumpFrameSettle(tester);
-      await tester.tap(find.byKey(const Key('export_menu_csv')));
+      unawaited(
+        showReportExportDialog(
+          tester.element(find.byType(DesktopShell)),
+          initialFormat: ReportExportFormat.csv,
+          initialScope: ReportExportScope.parkingUtilization,
+        ),
+      );
       await pumpFrameSettle(tester);
 
       expect(find.byKey(const Key('export_scope_audit_logs')), findsNothing);
@@ -362,9 +370,9 @@ void main() {
       expect(utf8.decode(savedBytes!), contains('B1'));
       expect(utf8.decode(savedBytes!), contains('B5'));
 
-      // 2. Switch to Admin in demo sheet or re-login -> verify Audit Logs scope is visible -> save PDF
+      // 2. Switch to Admin -> verify Audit Logs scope is visible -> save PDF
       final container = ProviderScope.containerOf(
-        tester.element(find.byKey(const Key('overview_export_report_button'))),
+        tester.element(find.byType(DesktopShell)),
       );
       await container
           .read(authControllerProvider.notifier)
