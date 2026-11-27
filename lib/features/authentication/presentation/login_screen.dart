@@ -10,7 +10,7 @@ import '../../../core/widgets/ui/sentry_ui.dart';
 import 'guard_activation_dialog.dart';
 import 'guard_password_reset_dialog.dart';
 
-/// View 1: Editorial, calm sign-in experience inspired by `design_reference/index.html`.
+/// View 1: Full-height split sign-in screen for SENTRY Guard & ICT Console.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -109,106 +109,153 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         autofocus: true,
         child: Scaffold(
           backgroundColor: p.bg,
-          body: Stack(
-            children: [
-              // Subtle atmospheric ambient glow behind hero stage
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: const Alignment(-0.75, -0.65),
-                        radius: 1.15,
-                        colors: [
-                          SentryColors.crimson
-                              .withValues(alpha: p.isDark ? 0.14 : 0.06),
-                          p.bg.withValues(alpha: 0.0),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 780;
+              final compactHeight = constraints.maxHeight < 760;
+              final hero = _buildEditorialLeft(
+                context,
+                compactHeight: compactHeight,
+              );
+              final form = _buildFormColumn(
+                context,
+                authState,
+                config.isMock,
+              );
+
+              return Stack(
+                children: [
+                  if (wide)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 10,
+                          child: ColoredBox(
+                            color: SentryColors.crimson,
+                            child: Center(
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 48,
+                                  vertical: compactHeight ? 24 : 48,
+                                ),
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 460),
+                                  child: hero,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 11,
+                          child: ColoredBox(
+                            color: p.bg,
+                            child: Center(
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 36,
+                                  vertical: compactHeight ? 24 : 48,
+                                ),
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 420),
+                                  child: form,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ColoredBox(
+                            color: SentryColors.crimson,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(28, 60, 28, 32),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 420),
+                                  child: hero,
+                                ),
+                              ),
+                            ),
+                          ),
+                          ColoredBox(
+                            color: p.bg,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(28, 32, 28, 40),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 420),
+                                  child: form,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ),
-              ),
-              // Subtle top-right theme toggle
-              Positioned(
-                top: 24,
-                right: 28,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (config.isMock)
-                      const StatusPill(
-                        label: 'Developer Test Mode',
-                        tone: PillTone.neutral,
-                        icon: Icons.science_outlined,
-                        tooltip: 'Developer test mode unlocked for this session',
-                      ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: themeMode == ThemeMode.dark
-                          ? 'Switch to light mode'
-                          : 'Switch to dark mode',
-                      onPressed: () {
-                        ref.read(themeModeProvider.notifier).state =
-                            themeMode == ThemeMode.dark
-                                ? ThemeMode.light
-                                : ThemeMode.dark;
-                      },
-                      icon: Icon(
-                        themeMode == ThemeMode.dark
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              // Centered editorial split stage
-              Center(
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 36),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1020),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 780;
-                        final hero = _buildEditorialLeft(context);
-                        final form =
-                            _buildFormCard(context, authState, config.isMock);
-                        if (!wide) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              hero,
-                              const SizedBox(height: 28),
-                              form,
-                            ],
-                          );
-                        }
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(flex: 11, child: hero),
-                            const SizedBox(width: 56),
-                            Expanded(flex: 10, child: form),
-                          ],
-                        );
-                      },
+                  // Top-right theme toggle & Developer Test Mode indicator
+                  Positioned(
+                    top: 20,
+                    right: 24,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (config.isMock)
+                          const StatusPill(
+                            label: 'Developer Test Mode',
+                            tone: PillTone.neutral,
+                            icon: Icons.science_outlined,
+                            tooltip:
+                                'Developer test mode unlocked for this session',
+                          ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: themeMode == ThemeMode.dark
+                              ? 'Switch to light mode'
+                              : 'Switch to dark mode',
+                          color: wide ? p.slate : Colors.white,
+                          onPressed: () {
+                            ref.read(themeModeProvider.notifier).state =
+                                themeMode == ThemeMode.dark
+                                    ? ThemeMode.light
+                                    : ThemeMode.dark;
+                          },
+                          icon: Icon(
+                            themeMode == ThemeMode.dark
+                                ? Icons.light_mode_outlined
+                                : Icons.dark_mode_outlined,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEditorialLeft(BuildContext context) {
-    final p = SentryPalette.of(context);
+  Widget _buildEditorialLeft(
+    BuildContext context, {
+    required bool compactHeight,
+  }) {
+    final verticalGap = compactHeight ? 18.0 : 24.0;
     return Reveal(
       index: 0,
       child: Column(
@@ -222,51 +269,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: SentryColors.crimson,
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                'BATSTATEU TNEU · ALANGILAN CAMPUS',
-                style: SentryTheme.eyebrow(color: p.crimson),
+              Flexible(
+                child: Text(
+                  'BATSTATEU TNEU · ALANGILAN CAMPUS',
+                  style: SentryTheme.eyebrow(color: Colors.white),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: verticalGap),
           GestureDetector(
             key: const Key('login_logo_hero'),
             behavior: HitTestBehavior.opaque,
             onTap: _handleLogoTap,
-            child: const _LogoHero(),
+            child: _LogoHero(compact: compactHeight),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: verticalGap),
           Text.rich(
-            TextSpan(
+            const TextSpan(
               children: [
-                const TextSpan(text: 'Smarter campus entry.\n'),
+                TextSpan(text: 'Smarter campus entry.\n'),
                 TextSpan(
                   text: 'Zero waiting.',
-                  style: TextStyle(color: p.crimson),
+                  style: TextStyle(color: Colors.white),
                 ),
               ],
             ),
             style: SentryTheme.display(
-              fontSize: 44,
+              fontSize: compactHeight ? 36 : 42,
               fontWeight: FontWeight.w800,
-              color: p.text,
+              color: Colors.white,
               height: 1.05,
-            ),
-          ),
-          const SizedBox(height: 18),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Text(
-              'Real-time gate verification and live campus parking across BatStateU Alangilan.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: p.muted,
-                    height: 1.55,
-                  ),
             ),
           ),
         ],
@@ -274,7 +312,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildFormCard(
+  InputDecoration _inputDecoration(
+    SentryPalette p, {
+    required String hintText,
+    required Widget prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    final radius = BorderRadius.circular(10);
+    return InputDecoration(
+      filled: true,
+      fillColor: p.card,
+      constraints: const BoxConstraints.tightFor(height: 48),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      suffixIconConstraints: const BoxConstraints(
+        minWidth: 44,
+        maxHeight: 48,
+      ),
+      hintText: hintText,
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.line, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.line, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: p.crimson, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildFormColumn(
     BuildContext context,
     AuthState authState,
     bool isMock,
@@ -282,213 +354,236 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final p = SentryPalette.of(context);
     return Reveal(
       index: 1,
-      scale: true,
-      child: SentryCard(
-        padding: const EdgeInsets.all(34),
-        radius: 24,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      'Sign in to Guard & ICT Console',
-                      style: SentryTheme.display(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: p.text,
-                      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    'Sign in',
+                    style: SentryTheme.display(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: p.text,
                     ),
                   ),
                 ),
-                const InfoHint(
-                  'Authorized for campus guards and ICT administrators. '
-                  'Student accounts use the SENTRY mobile app. '
-                  'Protected under RA 10173 (Data Privacy Act).',
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              isMock
-                  ? 'Choose a demo role or enter your operator credentials.'
-                  : 'Enter your operator credentials to sign in.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-
-            if (authState.infoBanner != null) ...[
-              Callout(
-                tone: PillTone.ok,
-                icon: Icons.check_circle_outline_rounded,
-                title: 'Account update',
-                message: authState.infoBanner,
               ),
-              const SizedBox(height: 16),
+              const InfoHint(
+                'Authorized for campus guards and ICT administrators. '
+                'Student accounts use the SENTRY mobile app. '
+                'Protected under RA 10173 (Data Privacy Act).',
+              ),
             ],
+          ),
+          const SizedBox(height: 24),
 
-            if (authState.sessionExpiredBanner != null) ...[
-              Callout(
-                tone: PillTone.warn,
-                icon: Icons.timer_off_outlined,
-                title: 'Session ended',
-                message: authState.sessionExpiredBanner,
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            if (authState.errorBanner != null) ...[
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: p.errTint,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: p.err.withValues(alpha: 0.35)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline_rounded,
-                        size: 20, color: p.errText),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        authState.errorBanner!,
-                        key: const Key('login_error_banner'),
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: p.errText,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            if (isMock) ...[
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: p.subtle,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: p.line),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _PersonaButton(
-                        key: const Key('persona_guard_chip'),
-                        label: 'Guard desk',
-                        selected: _selectedPersona == 0,
-                        icon: Icons.shield_outlined,
-                        onTap: () => _selectPersona(0),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _PersonaButton(
-                        key: const Key('persona_admin_chip'),
-                        label: 'Administrator',
-                        selected: _selectedPersona == 1,
-                        icon: Icons.admin_panel_settings_outlined,
-                        onTap: () => _selectPersona(1),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-
-            Text(
-              'University ID',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              key: const Key('login_username_field'),
-              controller: _usernameCtrl,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
-                hintText: isMock
-                    ? 'guard01@sentry.test'
-                    : 'operator@g.batstate-u.edu.ph',
-              ),
-              onSubmitted: (_) => _submitLogin(),
+          if (authState.infoBanner != null) ...[
+            Callout(
+              tone: PillTone.ok,
+              icon: Icons.check_circle_outline_rounded,
+              title: 'Account update',
+              message: authState.infoBanner,
             ),
             const SizedBox(height: 16),
+          ],
 
-            Text(
-              'Password',
-              style: Theme.of(context).textTheme.labelLarge,
+          if (authState.sessionExpiredBanner != null) ...[
+            Callout(
+              tone: PillTone.warn,
+              icon: Icons.timer_off_outlined,
+              title: 'Session ended',
+              message: authState.sessionExpiredBanner,
             ),
-            const SizedBox(height: 8),
-            TextField(
-              key: const Key('login_password_field'),
-              controller: _passwordCtrl,
-              obscureText: _obscurePassword,
-              onSubmitted: (_) => _submitLogin(),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
-                hintText: 'Enter password',
-                suffixIcon: IconButton(
-                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                  icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                    size: 20,
+            const SizedBox(height: 16),
+          ],
+
+          if (authState.errorBanner != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
-                  onPressed: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
-                  },
+                  decoration: BoxDecoration(
+                    color: p.errTint,
+                    border: Border(
+                      left: BorderSide(color: p.err, width: 3),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 18,
+                        color: p.err,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          authState.errorBanner!,
+                          key: const Key('login_error_banner'),
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: p.errText,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+          ],
 
-            SizedBox(
-              height: 50,
-              child: FilledButton.icon(
-                key: const Key('login_submit_button'),
-                onPressed: authState.isLoading ? null : _submitLogin,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 19),
-                label: Text(
-                  authState.isLoading ? 'Signing in…' : 'Sign in',
-                ),
+          if (isMock) ...[
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: p.subtle,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: p.line, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _PersonaButton(
+                      key: const Key('persona_guard_chip'),
+                      label: 'Guard desk',
+                      selected: _selectedPersona == 0,
+                      icon: Icons.shield_outlined,
+                      onTap: () => _selectPersona(0),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _PersonaButton(
+                      key: const Key('persona_admin_chip'),
+                      label: 'Administrator',
+                      selected: _selectedPersona == 1,
+                      icon: Icons.admin_panel_settings_outlined,
+                      onTap: () => _selectPersona(1),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            Wrap(
+            const SizedBox(height: 16),
+          ],
+
+          Text(
+            'University ID',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('login_username_field'),
+            controller: _usernameCtrl,
+            textInputAction: TextInputAction.next,
+            decoration: _inputDecoration(
+              p,
+              prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+              hintText: isMock
+                  ? 'guard01@sentry.test'
+                  : 'operator@g.batstate-u.edu.ph',
+            ),
+            onSubmitted: (_) => _submitLogin(),
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            'Password',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('login_password_field'),
+            controller: _passwordCtrl,
+            obscureText: _obscurePassword,
+            onSubmitted: (_) => _submitLogin(),
+            decoration: _inputDecoration(
+              p,
+              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+              hintText: 'Enter password',
+              suffixIcon: IconButton(
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(40, 40),
+                  padding: EdgeInsets.zero,
+                ),
+                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              key: const Key('login_submit_button'),
+              style: FilledButton.styleFrom(
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: authState.isLoading ? null : _submitLogin,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 19),
+              label: Text(
+                authState.isLoading ? 'Signing in…' : 'Sign in',
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.only(top: 12),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: p.line, width: 1)),
+            ),
+            child: Wrap(
               alignment: WrapAlignment.spaceBetween,
               spacing: 8,
               runSpacing: 4,
               children: [
-                TextButton(
+                _FooterLink(
                   key: const Key('guard_activation_link'),
+                  label: 'Guard first-time activation',
                   onPressed: authState.isLoading
                       ? null
                       : () => showGuardActivationDialog(context),
-                  child: const Text('Guard first-time activation'),
                 ),
-                TextButton(
+                _FooterLink(
                   key: const Key('guard_password_reset_link'),
+                  label: 'Forgot password?',
                   onPressed: authState.isLoading
                       ? null
                       : () => showGuardPasswordResetDialog(context),
-                  child: const Text('Forgot password?'),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -496,7 +591,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 /// Crimson hero tile with the inverted interactive logo and calm sonar rings.
 class _LogoHero extends StatefulWidget {
-  const _LogoHero();
+  final bool compact;
+
+  const _LogoHero({this.compact = false});
 
   @override
   State<_LogoHero> createState() => _LogoHeroState();
@@ -527,21 +624,23 @@ class _LogoHeroState extends State<_LogoHero>
 
   @override
   Widget build(BuildContext context) {
+    final tileSize = widget.compact ? 152.0 : 180.0;
+    final tileRadius = widget.compact ? 20.0 : 24.0;
     return Container(
-      width: 212,
-      height: 212,
+      width: tileSize,
+      height: tileSize,
       decoration: BoxDecoration(
         color: SentryColors.crimson,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(tileRadius),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.16),
+          color: Colors.white.withValues(alpha: 0.20),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SentryColors.crimson.withValues(alpha: 0.28),
-            blurRadius: 36,
-            offset: const Offset(0, 16),
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
             spreadRadius: -8,
           ),
         ],
@@ -603,24 +702,39 @@ class _PersonaButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    final fg = selected ? (p.isDark ? p.bg : Colors.white) : p.slate;
+    final fg = selected ? p.text : p.muted;
+    final iconColor = selected ? SentryColors.crimson : p.muted;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: SentryMotion.of(context, SentryMotion.short),
           curve: SentryMotion.emphasized,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? p.text : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            color: selected ? p.card : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? p.line : Colors.transparent,
+              width: 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black
+                          .withValues(alpha: p.isDark ? 0.22 : 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 17, color: selected ? p.crimsonHover : fg),
+              Icon(icon, size: 17, color: iconColor),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -628,7 +742,7 @@ class _PersonaButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     color: fg,
                   ),
                 ),
@@ -637,6 +751,53 @@ class _PersonaButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FooterLink extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+
+  const _FooterLink({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    return TextButton(
+      onPressed: onPressed,
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size.zero),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        ),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return p.muted.withValues(alpha: 0.5);
+          }
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused) ||
+              states.contains(WidgetState.pressed)) {
+            return SentryColors.crimson;
+          }
+          return p.muted;
+        }),
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(
+            fontFamily: SentryTheme.sansFontFamily,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+      ),
+      child: Text(label),
     );
   }
 }
