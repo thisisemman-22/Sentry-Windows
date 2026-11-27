@@ -9,6 +9,7 @@ import '../../../core/widgets/plate_badge.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/models/attempt_models.dart';
 import '../../../shared/models/parking_models.dart';
+import '../../../shared/models/spec_2026_models.dart';
 import '../../access_logs/presentation/report_export_dialog.dart';
 import 'campus_tactical_map.dart';
 import 'overview_charts.dart';
@@ -23,7 +24,10 @@ class OverviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = SentryPalette.of(context);
     final sysState = ref.watch(sentryScenarioProvider);
+    final opsState = ref.watch(desktopOpsControllerProvider);
     final config = ref.watch(appConfigProvider);
+    final isAdmin =
+        ref.watch(authControllerProvider.select((s) => s.role.isAdmin));
     final kpis = sysState.computeDashboardKpis();
     final lotSummaries = sysState.computeLotSummaries();
     final hasLiveSnapshot = !config.isReal ||
@@ -88,8 +92,9 @@ class OverviewScreen extends ConsumerWidget {
               icon: Icons.videocam_outlined,
               label: 'Gate lanes',
               onPressed: () {
+                ref.read(monitoringSubTabProvider.notifier).state = 0;
                 ref.read(selectedDesktopTabProvider.notifier).state =
-                    DesktopNavTab.liveGateMonitoring;
+                    DesktopNavTab.monitoring;
               },
             ),
           ],
@@ -139,8 +144,9 @@ class OverviewScreen extends ConsumerWidget {
                       if (laneId != null) {
                         ref.read(focusedLaneProvider.notifier).state = laneId;
                       }
+                      ref.read(monitoringSubTabProvider.notifier).state = 0;
                       ref.read(selectedDesktopTabProvider.notifier).state =
-                          DesktopNavTab.liveGateMonitoring;
+                          DesktopNavTab.monitoring;
                     },
                   ),
                 ),
@@ -152,12 +158,32 @@ class OverviewScreen extends ConsumerWidget {
                     onlineDevices: kpis.onlineDevicesCount,
                     totalDevices: kpis.totalDevicesCount,
                     onViewAll: () {
+                      ref.read(monitoringSubTabProvider.notifier).state = 2;
                       ref.read(selectedDesktopTabProvider.notifier).state =
-                          DesktopNavTab.accessLogs;
+                          DesktopNavTab.monitoring;
                     },
                     onInspectDevices: () {
+                      ref.read(monitoringSubTabProvider.notifier).state = 3;
                       ref.read(selectedDesktopTabProvider.notifier).state =
-                          DesktopNavTab.deviceMonitoring;
+                          DesktopNavTab.monitoring;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                BentoReveal(
+                  index: 6,
+                  child: _SystemHealthGlassCard(
+                    health: opsState.systemHealth,
+                    onlineDevices: kpis.onlineDevicesCount,
+                    totalDevices: kpis.totalDevicesCount,
+                    hasLiveSnapshot: hasLiveSnapshot,
+                    canRetryDeadLetters: isAdmin,
+                    onRetryDeadLetter: (id) async {
+                      final actor = ref.read(authControllerProvider).profile;
+                      if (actor == null) return;
+                      await ref
+                          .read(desktopOpsControllerProvider.notifier)
+                          .retryDeadLetter(id, actor: actor);
                     },
                   ),
                 ),
@@ -184,7 +210,7 @@ class OverviewScreen extends ConsumerWidget {
                         !awaitingLotTelemetry && sysState.spaces.isNotEmpty,
                     onOpenParking: () {
                       ref.read(selectedDesktopTabProvider.notifier).state =
-                          DesktopNavTab.parkingManagement;
+                          DesktopNavTab.parking;
                     },
                   ),
                 ),
@@ -199,8 +225,9 @@ class OverviewScreen extends ConsumerWidget {
                     attemptHistory: sysState.attemptHistory,
                     hasLiveSnapshot: hasLiveSnapshot,
                     onExpand: () {
+                      ref.read(monitoringSubTabProvider.notifier).state = 2;
                       ref.read(selectedDesktopTabProvider.notifier).state =
-                          DesktopNavTab.accessLogs;
+                          DesktopNavTab.monitoring;
                     },
                   ),
                 ),
@@ -241,7 +268,7 @@ class OverviewScreen extends ConsumerWidget {
                     ref.read(selectedParkingLotProvider.notifier).state =
                         lotCode;
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.parkingManagement;
+                        DesktopNavTab.parking;
                   },
                   panels: [
                     bottomChartsRow,
@@ -351,7 +378,7 @@ class OverviewScreen extends ConsumerWidget {
             Navigator.of(ctx).maybePop();
             ref.read(selectedParkingLotProvider.notifier).state = lot.lotCode;
             ref.read(selectedDesktopTabProvider.notifier).state =
-                DesktopNavTab.parkingManagement;
+                DesktopNavTab.parking;
           },
           icon: const Icon(Icons.map_outlined, size: 18),
           label: const Text('Open in Parking map'),
@@ -422,7 +449,7 @@ class _CompactSpatialOverview extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () {
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.parkingManagement;
+                        DesktopNavTab.parking;
                   },
                   icon: const Icon(Icons.local_parking_rounded, size: 18),
                   label: const Text('Parking map'),
@@ -463,7 +490,7 @@ class _CompactSpatialOverview extends ConsumerWidget {
                 onOpenLotBlueprint: (lotCode) {
                   ref.read(selectedParkingLotProvider.notifier).state = lotCode;
                   ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.parkingManagement;
+                      DesktopNavTab.parking;
                 },
               ),
             ),
@@ -485,7 +512,7 @@ class _CompactSpatialOverview extends ConsumerWidget {
               !awaitingLotTelemetry && (sysState.spaces as List).isNotEmpty,
           onOpenParking: () {
             ref.read(selectedDesktopTabProvider.notifier).state =
-                DesktopNavTab.parkingManagement;
+                DesktopNavTab.parking;
           },
         ),
         const SizedBox(height: 16),
@@ -502,8 +529,9 @@ class _CompactSpatialOverview extends ConsumerWidget {
             if (laneId != null) {
               ref.read(focusedLaneProvider.notifier).state = laneId;
             }
+            ref.read(monitoringSubTabProvider.notifier).state = 0;
             ref.read(selectedDesktopTabProvider.notifier).state =
-                DesktopNavTab.liveGateMonitoring;
+                DesktopNavTab.monitoring;
           },
         ),
         const SizedBox(height: 16),
@@ -512,12 +540,30 @@ class _CompactSpatialOverview extends ConsumerWidget {
           onlineDevices: kpis.onlineDevicesCount as int,
           totalDevices: kpis.totalDevicesCount as int,
           onViewAll: () {
+            ref.read(monitoringSubTabProvider.notifier).state = 2;
             ref.read(selectedDesktopTabProvider.notifier).state =
-                DesktopNavTab.accessLogs;
+                DesktopNavTab.monitoring;
           },
           onInspectDevices: () {
+            ref.read(monitoringSubTabProvider.notifier).state = 3;
             ref.read(selectedDesktopTabProvider.notifier).state =
-                DesktopNavTab.deviceMonitoring;
+                DesktopNavTab.monitoring;
+          },
+        ),
+        const SizedBox(height: 16),
+        _SystemHealthGlassCard(
+          health: ref.watch(desktopOpsControllerProvider).systemHealth,
+          onlineDevices: kpis.onlineDevicesCount as int,
+          totalDevices: kpis.totalDevicesCount as int,
+          hasLiveSnapshot: hasLiveSnapshot,
+          canRetryDeadLetters:
+              ref.watch(authControllerProvider.select((s) => s.role.isAdmin)),
+          onRetryDeadLetter: (id) async {
+            final actor = ref.read(authControllerProvider).profile;
+            if (actor == null) return;
+            await ref
+                .read(desktopOpsControllerProvider.notifier)
+                .retryDeadLetter(id, actor: actor);
           },
         ),
       ],
@@ -681,7 +727,7 @@ class _CampusOverviewBentoPanel extends ConsumerWidget {
                 tooltip: 'Open parking map',
                 onPressed: () {
                   ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.parkingManagement;
+                      DesktopNavTab.parking;
                 },
                 size: 34,
               ),
@@ -695,8 +741,9 @@ class _CampusOverviewBentoPanel extends ConsumerWidget {
                   height: 132,
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   onTap: () {
+                    ref.read(monitoringSubTabProvider.notifier).state = 2;
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.accessLogs;
+                        DesktopNavTab.monitoring;
                   },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -781,8 +828,9 @@ class _CampusOverviewBentoPanel extends ConsumerWidget {
                   height: 132,
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   onTap: () {
+                    ref.read(monitoringSubTabProvider.notifier).state = 0;
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.liveGateMonitoring;
+                        DesktopNavTab.monitoring;
                   },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -872,8 +920,9 @@ class _CampusOverviewBentoPanel extends ConsumerWidget {
                   height: 132,
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   onTap: () {
+                    ref.read(monitoringSubTabProvider.notifier).state = 1;
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.guardReviews;
+                        DesktopNavTab.monitoring;
                   },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -957,7 +1006,7 @@ class _CampusOverviewBentoPanel extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   onTap: () {
                     ref.read(selectedDesktopTabProvider.notifier).state =
-                        DesktopNavTab.parkingManagement;
+                        DesktopNavTab.parking;
                   },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1385,6 +1434,154 @@ class _ReadableActivityTile extends StatelessWidget {
       title: detail,
       subtitle: cleanSource,
       tone: tone,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Card D — System Health & Failed Deliveries (Dead Letters)
+// ---------------------------------------------------------------------------
+
+class _SystemHealthGlassCard extends StatelessWidget {
+  final SystemHealthDto health;
+  final int onlineDevices;
+  final int totalDevices;
+  final bool hasLiveSnapshot;
+  final bool canRetryDeadLetters;
+  final Future<void> Function(String id) onRetryDeadLetter;
+
+  const _SystemHealthGlassCard({
+    required this.health,
+    required this.onlineDevices,
+    required this.totalDevices,
+    required this.hasLiveSnapshot,
+    required this.canRetryDeadLetters,
+    required this.onRetryDeadLetter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    final failedLetters =
+        health.deadLetters.where((d) => d.status == 'failed').toList();
+    final isHealthy =
+        health.overallStatus == 'healthy' && failedLetters.isEmpty;
+    final hasHealth =
+        hasLiveSnapshot && health.overallStatus != 'unknown';
+
+    return SpatialGlass(
+      key: const Key('dashboard_system_health_card'),
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'System health',
+                  style: panelTitleStyle(p, size: 17),
+                ),
+              ),
+              SoftChip(
+                !hasHealth
+                    ? 'Awaiting telemetry'
+                    : (isHealthy ? 'Healthy' : 'Degraded'),
+                tone: !hasHealth
+                    ? SoftChipTone.neutral
+                    : (isHealthy ? SoftChipTone.ok : SoftChipTone.warn),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              SoftChip(
+                hasHealth
+                    ? 'Scheduler: ${health.schedulerStatus == 'running' ? 'Running' : 'Degraded'}'
+                    : 'Scheduler: —',
+                tone: hasHealth && health.schedulerStatus == 'running'
+                    ? SoftChipTone.ok
+                    : SoftChipTone.neutral,
+              ),
+              SoftChip(
+                totalDevices > 0
+                    ? 'Cameras: $onlineDevices/$totalDevices online'
+                    : 'Cameras: —',
+                tone: totalDevices > 0 && onlineDevices == totalDevices
+                    ? SoftChipTone.ok
+                    : SoftChipTone.neutral,
+              ),
+            ],
+          ),
+          if (failedLetters.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Failed Deliveries (${failedLetters.length})',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: p.warnText,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < failedLetters.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              GlassTile(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${failedLetters[i].channel.toUpperCase()} · ${failedLetters[i].recipient}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: SentryTheme.sansFontFamily,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: p.text,
+                            ),
+                          ),
+                          Text(
+                            failedLetters[i].errorMessage,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: SentryTheme.sansFontFamily,
+                              fontSize: 11.5,
+                              color: p.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (canRetryDeadLetters) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        key: Key('dead_letter_retry_${failedLetters[i].id}'),
+                        onPressed: () =>
+                            onRetryDeadLetter(failedLetters[i].id),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 32),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }

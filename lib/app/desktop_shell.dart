@@ -35,7 +35,7 @@ class DesktopShell extends ConsumerStatefulWidget {
 }
 
 class _DesktopShellState extends ConsumerState<DesktopShell> {
-  DesktopNavTab _previousTab = DesktopNavTab.overview;
+  DesktopNavTab _previousTab = DesktopNavTab.dashboard;
 
   @override
   void initState() {
@@ -73,7 +73,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final isAdmin =
         ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
     final visibleTabs = DesktopNavTab.values
-        .where((t) => isAdmin || t != DesktopNavTab.administration)
+        .where((t) => isAdmin || !t.isAdminOnly)
         .toList();
 
     // Surface simulator / action feedback as a toast instead of a banner strip.
@@ -91,12 +91,22 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       }
     });
 
+    const shortcutKeys = <LogicalKeyboardKey>[
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+      LogicalKeyboardKey.digit5,
+      LogicalKeyboardKey.digit6,
+      LogicalKeyboardKey.digit7,
+      LogicalKeyboardKey.digit8,
+      LogicalKeyboardKey.digit9,
+      LogicalKeyboardKey.digit0,
+    ];
     final shortcuts = <ShortcutActivator, VoidCallback>{
-      for (var i = 0; i < visibleTabs.length; i++)
-        SingleActivator(
-          LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i),
-          control: true,
-        ): () => _go(visibleTabs[i]),
+      for (var i = 0; i < visibleTabs.length && i < shortcutKeys.length; i++)
+        SingleActivator(shortcutKeys[i], control: true): () =>
+            _go(visibleTabs[i]),
       const SingleActivator(LogicalKeyboardKey.keyB, control: true): () =>
           ref.read(sidebarCollapsedProvider.notifier).state = !collapsed,
       const SingleActivator(LogicalKeyboardKey.keyL,
@@ -167,20 +177,23 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                 )
               : null,
           bottomNavigationBar: isMobile
-              ? NavigationBar(
-                  backgroundColor: p.card,
-                  selectedIndex: activeTab.index.clamp(0, 4),
-                  onDestinationSelected: (idx) =>
-                      _go(DesktopNavTab.values[idx]),
-                  destinations: [
-                    for (final t in DesktopNavTab.values.take(5))
-                      NavigationDestination(
-                        icon: Icon(t.icon),
-                        selectedIcon: Icon(t.selectedIcon),
-                        label: t.title,
-                      ),
-                  ],
-                )
+              ? Builder(builder: (context) {
+                  final mobileTabs = visibleTabs.take(4).toList();
+                  final idx = mobileTabs.indexOf(activeTab);
+                  return NavigationBar(
+                    backgroundColor: p.card,
+                    selectedIndex: idx >= 0 ? idx : 0,
+                    onDestinationSelected: (i) => _go(mobileTabs[i]),
+                    destinations: [
+                      for (final t in mobileTabs)
+                        NavigationDestination(
+                          icon: Icon(t.icon),
+                          selectedIcon: Icon(t.selectedIcon),
+                          label: t.title,
+                        ),
+                    ],
+                  );
+                })
               : null,
           body: SafeArea(
             child: Row(
@@ -237,12 +250,15 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = SentryPalette.of(context);
-    final kpis = ref.watch(
-        sentryScenarioProvider.select((s) => s.computeDashboardKpis()));
     final authState = ref.watch(authControllerProvider);
     final themeMode = ref.watch(themeModeProvider);
     final profile = authState.profile;
     if (profile == null) return const SizedBox.shrink();
+    final visibleTabs = DesktopNavTab.values
+        .where((t) => profile.role.isAdmin || !t.isAdminOnly)
+        .toList();
+    final kpis = ref.watch(
+        sentryScenarioProvider.select((s) => s.computeDashboardKpis()));
     final width = collapsed ? 84.0 : 252.0;
     final railColor =
         floating && p.isDark ? const Color(0xEB121215) : p.card;
@@ -317,39 +333,42 @@ class _Sidebar extends ConsumerWidget {
               // Navigation
               Expanded(
                 child: FocusTraversalGroup(
-                  child: ListView(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    children: [
-                      for (final tab in DesktopNavTab.values.where(
-                        (t) =>
-                            profile.role.isAdmin ||
-                            t != DesktopNavTab.administration,
-                      )) ...[
-                        if (_sectionLabelFor(tab) != null)
-                          _NavSectionLabel(
-                            label: _sectionLabelFor(tab)!,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final tab in visibleTabs) ...[
+                          if (_sectionLabelFor(tab,
+                                  isAdmin: profile.role.isAdmin) !=
+                              null)
+                            _NavSectionLabel(
+                              label: _sectionLabelFor(
+                                tab,
+                                isAdmin: profile.role.isAdmin,
+                              )!,
+                              collapsed: collapsed,
+                            ),
+                          _NavItem(
+                            key: Key('nav_tab_${tab.name}'),
+                            tab: tab,
+                            selected: tab == activeTab,
                             collapsed: collapsed,
+                            locked: false,
+                            badge: switch (tab) {
+                              DesktopNavTab.monitoring =>
+                                kpis.activeHoldsAwaitingPassageCount +
+                                    kpis.pendingGuardReviewsCount,
+                              _ => 0,
+                            },
+                            badgeTone: kpis.pendingGuardReviewsCount > 0
+                                ? PillTone.err
+                                : PillTone.warn,
+                            onTap: () => onSelect(tab),
                           ),
-                        _NavItem(
-                          key: Key('nav_tab_${tab.name}'),
-                          tab: tab,
-                          selected: tab == activeTab,
-                          collapsed: collapsed,
-                          locked: false,
-                          badge: switch (tab) {
-                            DesktopNavTab.liveGateMonitoring =>
-                              kpis.activeHoldsAwaitingPassageCount,
-                            DesktopNavTab.guardReviews =>
-                              kpis.pendingGuardReviewsCount,
-                            _ => 0,
-                          },
-                          badgeTone: tab == DesktopNavTab.guardReviews
-                              ? PillTone.err
-                              : PillTone.warn,
-                          onTap: () => onSelect(tab),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -505,10 +524,12 @@ class _Sidebar extends ConsumerWidget {
   }
 }
 
-String? _sectionLabelFor(DesktopNavTab tab) => switch (tab) {
-      DesktopNavTab.overview => 'OPERATIONS',
-      DesktopNavTab.accessLogs => 'RECORDS & HARDWARE',
-      DesktopNavTab.administration => 'SYSTEM',
+String? _sectionLabelFor(DesktopNavTab tab, {required bool isAdmin}) =>
+    switch (tab) {
+      DesktopNavTab.dashboard => 'OPERATIONS',
+      DesktopNavTab.users => isAdmin ? 'DIRECTORY & FLEET' : null,
+      DesktopNavTab.parking => isAdmin ? null : 'FACILITIES & REPORTS',
+      DesktopNavTab.announcements => isAdmin ? 'SYSTEM' : null,
       _ => null,
     };
 
@@ -565,7 +586,7 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
         ref.watch(authControllerProvider).profile?.role.isAdmin ?? false;
     final q = _q.trim().toUpperCase();
     final views = DesktopNavTab.values
-        .where((t) => isAdmin || t != DesktopNavTab.administration)
+        .where((t) => isAdmin || !t.isAdminOnly)
         .where((t) => q.isEmpty || t.title.toUpperCase().contains(q))
         .toList();
     final people = q.isEmpty
@@ -641,7 +662,10 @@ class _CommandPaletteState extends ConsumerState<_CommandPalette> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      onTap: () => go(DesktopNavTab.accessLogs),
+                      onTap: () {
+                        ref.read(monitoringSubTabProvider.notifier).state = 2;
+                        go(DesktopNavTab.monitoring);
+                      },
                     ),
                   if (views.isEmpty && people.isEmpty)
                     Padding(
@@ -669,7 +693,7 @@ class _NavItem extends StatefulWidget {
   final VoidCallback onTap;
 
   const _NavItem({
-    super.key,
+    required Key super.key,
     required this.tab,
     required this.selected,
     required this.collapsed,
@@ -967,6 +991,7 @@ class _OperatorChip extends ConsumerWidget {
           ),
           const Divider(height: 8),
           MenuItemButton(
+            key: const Key('menu_sign_out'),
             leadingIcon: const Icon(Icons.logout_rounded),
             onPressed: () =>
                 ref.read(authControllerProvider.notifier).signOut(),
@@ -979,6 +1004,7 @@ class _OperatorChip extends ConsumerWidget {
             color: p.subtle,
             borderRadius: BorderRadius.circular(18),
             child: InkWell(
+              key: const Key('operator_account_menu_button'),
               borderRadius: BorderRadius.circular(18),
               onTap: () =>
                   controller.isOpen ? controller.close() : controller.open(),
@@ -1213,10 +1239,10 @@ class _ConnectionStatus extends StatelessWidget {
             ? p.warnText
             : p.errText;
     final label = isConnected
-        ? 'Connected'
+        ? 'Live'
         : isReconnecting
-            ? 'Reconnecting'
-            : 'Offline';
+            ? 'Connecting'
+            : 'Polling';
 
     return Semantics(
       liveRegion: true,

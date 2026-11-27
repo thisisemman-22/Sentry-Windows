@@ -1196,3 +1196,29 @@ class ScreenScaffold extends StatelessWidget {
     );
   }
 }
+
+/// Calm RBAC callout panel shown whenever a restricted view is opened by
+/// a non-Administrator account (never exposes admin controls).
+class RoleRestrictedPanel extends StatelessWidget {
+  final String featureName;
+  final String minimumRole;
+
+  const RoleRestrictedPanel({
+    super.key,
+    required this.featureName,
+    this.minimumRole = 'administrator',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SentryCard(
+      padding: const EdgeInsets.all(24),
+      child: EmptyState(
+        icon: Icons.admin_panel_settings_outlined,
+        title: 'Administrator access required',
+        message:
+            '$featureName requires "$minimumRole" privileges. Your account remains scoped to operational guard duties.',
+      ),
+    );
+  }
+}

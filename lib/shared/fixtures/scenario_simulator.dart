@@ -3026,4 +3026,201 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     wsCoordinator.handleRealtimeEnvelope(envelope);
     state = state.copyWith(wsState: wsCoordinator.state);
   }
+
+  /// Appends an audited event entry to the shared `auditLogs` stream.
+  void appendAuditLog(AuditLogDto log) {
+    state = state.copyWith(auditLogs: [log, ...state.auditLogs]);
+  }
+
+  /// Edits a participant's basic profile metadata (`Users` detail drawer).
+  ApiEnvelope<ParticipantUserDto> updateParticipantProfile({
+    required ProfileDto actor,
+    required String userCode,
+    required String fullName,
+    required String roleCode,
+    String? buildingCode,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only administrators can edit user profiles.',
+        httpStatus: 403,
+      );
+    }
+    ParticipantUserDto? updated;
+    final dir = state.participantDirectory.map((u) {
+      if (u.userCode != userCode) return u;
+      updated = u.copyWith(
+        fullName: fullName.trim(),
+        roleCode: roleCode,
+        buildingCode: buildingCode,
+      );
+      return updated!;
+    }).toList();
+    if (updated == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'User $userCode not found.',
+        httpStatus: 404,
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final log = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: 'user_profile_updated',
+      resourceType: 'participant_user',
+      resourceId: updated!.userId,
+      requestId: 'req-usr-upd-$_seqCounter',
+      summary:
+          'Admin ${actor.userCode} updated profile $userCode (${updated!.fullName}, ${updated!.roleCode}).',
+    );
+    state = state.copyWith(
+      participantDirectory: dir,
+      auditLogs: [log, ...state.auditLogs],
+      lastActionBanner: 'Updated $userCode (${updated!.fullName}).',
+    );
+    return ApiEnvelope.success(updated!);
+  }
+
+  /// Edits vehicle type/plate (no documents) or removes a vehicle (`Vehicles & RFID`).
+  ApiEnvelope<bool> editOrRemoveParticipantVehicle({
+    required ProfileDto actor,
+    required String userCode,
+    required String vehicleCode,
+    String? newVehicleType,
+    String? newPlateDisplay,
+    bool remove = false,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only administrators can modify vehicles.',
+        httpStatus: 403,
+      );
+    }
+    final now = DateTime.now().toUtc();
+    bool found = false;
+    final dir = state.participantDirectory.map((u) {
+      if (u.userCode != userCode) return u;
+      if (remove) {
+        final next =
+            u.vehicles.where((v) => v.vehicleCode != vehicleCode).toList();
+        if (next.length != u.vehicles.length) found = true;
+        return u.copyWith(vehicles: next);
+      }
+      final next = u.vehicles.map((v) {
+        if (v.vehicleCode != vehicleCode) return v;
+        found = true;
+        final cleanPlate = newPlateDisplay?.trim().toUpperCase();
+        final normPlate = cleanPlate == null || cleanPlate.isEmpty
+            ? v.normalizedPlateNumber
+            : cleanPlate.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+        return v.copyWith(
+          vehicleType: newVehicleType ?? v.vehicleType,
+          plateNumberDisplay:
+              cleanPlate != null && cleanPlate.isNotEmpty ? cleanPlate : null,
+          normalizedPlateNumber: normPlate,
+          updatedAtUtc: now,
+        );
+      }).toList();
+      return u.copyWith(vehicles: next);
+    }).toList();
+
+    if (!found) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'Vehicle $vehicleCode under $userCode not found.',
+        httpStatus: 404,
+      );
+    }
+
+    final log = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: remove ? 'vehicle_removed' : 'vehicle_updated',
+      resourceType: 'participant_vehicle',
+      resourceId: vehicleCode,
+      requestId: 'req-veh-$_seqCounter',
+      summary: remove
+          ? 'Admin ${actor.userCode} removed vehicle $vehicleCode from $userCode.'
+          : 'Admin ${actor.userCode} updated vehicle $vehicleCode ($newVehicleType / $newPlateDisplay).',
+    );
+    state = state.copyWith(
+      participantDirectory: dir,
+      auditLogs: [log, ...state.auditLogs],
+      lastActionBanner:
+          remove ? 'Removed vehicle $vehicleCode.' : 'Updated vehicle $vehicleCode.',
+    );
+    return ApiEnvelope.success(true);
+  }
+
+  /// Manual bay active/status override allowed ONLY for **Lot B1 (CIT)**.
+  /// Lots B2–B4 are camera-sensed (manual edits strictly locked); B5 is Overflow.
+  ApiEnvelope<SpaceDto> toggleLotB1SpaceManual({
+    required String spaceCode,
+    required ProfileDto actor,
+    bool? isBayActive,
+    String? physicalStatus,
+  }) {
+    if (!actor.role.isAdmin) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only administrators can toggle manual bay status.',
+        httpStatus: 403,
+      );
+    }
+    final idx = state.spaces.indexWhere((s) => s.spaceCode == spaceCode);
+    if (idx < 0) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.notFound,
+        message: 'Bay $spaceCode not found.',
+        httpStatus: 404,
+      );
+    }
+    final target = state.spaces[idx];
+    if (target.lotCode != 'B1') {
+      return ApiEnvelope.failure(
+        code: 'CAMERA_LOCKED_LOT',
+        message:
+            'Lot ${target.lotCode} is camera-sensed or overflow. Manual slot edits are locked outside Lot B1 (CIT).',
+        httpStatus: 403,
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final updatedSpace = target.copyWith(
+      isBayActive: isBayActive ?? target.isBayActive,
+      physicalStatus: physicalStatus ?? target.physicalStatus,
+      lastObservedAtUtc: now,
+    );
+    final updatedSpaces = List<SpaceDto>.from(state.spaces)
+      ..[idx] = updatedSpace;
+    final log = AuditLogDto(
+      auditId: 'AUD-${_seqCounter++}',
+      occurredAtUtc: now,
+      actorUserId: actor.userId,
+      actorUserCode: actor.userCode,
+      actorRole: actor.role.wireValue,
+      action: 'parking_slot_manual_override',
+      resourceType: 'parking_space',
+      resourceId: target.spaceId,
+      requestId: 'req-b1-override-$_seqCounter',
+      summary:
+          'Admin ${actor.userCode} updated Lot B1 bay $spaceCode (active=${updatedSpace.isBayActive}, physical=${updatedSpace.physicalStatus}).',
+    );
+    state = state.copyWith(
+      spaces: updatedSpaces,
+      auditLogs: [log, ...state.auditLogs],
+      lastActionBanner:
+          'Lot B1 · $spaceCode updated (${updatedSpace.isBayActive ? 'Active' : 'Inactive'} · ${updatedSpace.physicalStatus}).',
+    );
+    return ApiEnvelope.success(updatedSpace);
+  }
 }

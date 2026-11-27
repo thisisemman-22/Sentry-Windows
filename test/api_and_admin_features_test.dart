@@ -340,17 +340,15 @@ void main() {
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await tester.pump();
 
-      // 2. Navigate to View 8: Administration
-      await tester.tap(find.byKey(const Key('nav_tab_administration')));
+      // 2. Navigate to Users -> Register User
+      await tester.tap(find.byKey(const Key('nav_tab_users')));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
-      // Open Tab 3: Drivers & vehicles (Planned), then open Legacy manual form
-      await tester.tap(find.byKey(const Key('admin_subtab_3')));
+      // Open Tab 1: Register User (unified registration & RA 10173 consent)
+      await tester.tap(find.byKey(const Key('users_subtab_1')));
       await tester.pump();
-      await tester.tap(
-        find.byKey(const Key('open_manual_registration_tab_button')),
-      );
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
       // 3. Test duplicate plate 409 DATABASE_CONFLICT (UKQ 247 belongs to V001)
       await tester.enterText(
@@ -398,6 +396,7 @@ void main() {
       // 5. Click "Proceed to Facial Enrollment →" -> switches to Facial Enrollment tab with U008 selected
       await tester.tap(proceedBtn);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
 
       expect(find.text('not_enrolled'), findsWidgets);
 
@@ -448,8 +447,13 @@ void main() {
 
       expect(find.text('not_enrolled'), findsWidgets);
 
-      // 8. Verify newly registered user U008 also appears in View 6: Access Logs & Lookup
-      await tester.tap(find.byKey(const Key('nav_tab_accessLogs')));
+      // 8. Verify newly registered user U008 also appears in Monitoring -> Entries & Exits -> Drivers & vehicles
+      await tester.tap(find.byKey(const Key('nav_tab_monitoring')));
+      await tester.pump();
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.tap(find.byKey(const Key('monitoring_subtab_2')));
       await tester.pump();
       for (var i = 0; i < 8; i++) {
         await tester.pump(const Duration(milliseconds: 100));

@@ -11,6 +11,7 @@ class ParticipantVehicleDto {
   final String? rfidUid;
   final String vehicleStatus; // 'active' | 'inactive' | 'revoked'
   final String authorizationStatus; // 'authorized' | 'suspended' | 'revoked'
+  final String approvalStatus; // 'approved' | 'pending' | 'rejected'
   final bool isPrimaryVehicle;
   final String? notes;
   final DateTime updatedAtUtc;
@@ -25,10 +26,16 @@ class ParticipantVehicleDto {
     this.rfidUid,
     this.vehicleStatus = 'active',
     this.authorizationStatus = 'authorized',
+    this.approvalStatus = 'approved',
     this.isPrimaryVehicle = true,
     this.notes,
     required this.updatedAtUtc,
   });
+
+  bool get isGateEligible =>
+      approvalStatus == 'approved' &&
+      vehicleStatus == 'active' &&
+      authorizationStatus == 'authorized';
 
   ParticipantVehicleDto copyWith({
     String? vehicleType,
@@ -37,6 +44,7 @@ class ParticipantVehicleDto {
     String? rfidUid,
     String? vehicleStatus,
     String? authorizationStatus,
+    String? approvalStatus,
     bool? isPrimaryVehicle,
     String? notes,
     DateTime? updatedAtUtc,
@@ -52,6 +60,7 @@ class ParticipantVehicleDto {
       rfidUid: rfidUid ?? this.rfidUid,
       vehicleStatus: vehicleStatus ?? this.vehicleStatus,
       authorizationStatus: authorizationStatus ?? this.authorizationStatus,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
       isPrimaryVehicle: isPrimaryVehicle ?? this.isPrimaryVehicle,
       notes: notes ?? this.notes,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
@@ -71,6 +80,9 @@ class ParticipantVehicleDto {
       vehicleStatus: json['vehicle_status']?.toString() ?? 'active',
       authorizationStatus:
           json['authorization_status']?.toString() ?? 'authorized',
+      approvalStatus: json['approval_status']?.toString() ??
+          json['status']?.toString() ??
+          'approved',
       isPrimaryVehicle: json['is_primary_vehicle'] != false,
       notes: json['notes']?.toString(),
       updatedAtUtc: DateTime.tryParse(json['updated_at']?.toString() ?? '')
@@ -89,6 +101,7 @@ class ParticipantVehicleDto {
         'rfid_uid': rfidUid,
         'vehicle_status': vehicleStatus,
         'authorization_status': authorizationStatus,
+        'approval_status': approvalStatus,
         'is_primary_vehicle': isPrimaryVehicle,
         'notes': notes,
         'updated_at': ManilaTime.toUtcIso(updatedAtUtc),
@@ -233,8 +246,10 @@ class ManualUserRegistrationRequest {
         !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmedEmail)) {
       errors['email'] = 'Enter a valid campus or institutional email address.';
     }
-    if (!const {'student', 'guard', 'administrator'}.contains(roleCode)) {
-      errors['role_code'] = 'Role must be student, guard, or administrator.';
+    if (!const {'student', 'faculty', 'staff', 'guard', 'administrator'}
+        .contains(roleCode)) {
+      errors['role_code'] =
+          'Role must be student, faculty, staff, guard, or administrator.';
     }
     if (roleCode == 'student' && !includeVehicle) {
       errors['vehicle'] =
@@ -250,17 +265,23 @@ class ManualUserRegistrationRequest {
           errors['plate_number'] =
               'License plate is required for cars (2–12 alphanumeric characters).';
         }
+        if (rawRfid.isNotEmpty &&
+            !RegExp(r'^(?:[0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$')
+                .hasMatch(rawRfid)) {
+          errors['rfid_uid'] =
+              'RFID UID must be 8, 14, or 20 uppercase hexadecimal characters.';
+        }
       } else if (vType == 'motorcycle') {
         if (normPlate.isNotEmpty &&
             (normPlate.length < 2 || normPlate.length > 12)) {
           errors['plate_number'] =
               'Normalized plate must be 2–12 alphanumeric characters.';
         }
-        if (rawRfid.isNotEmpty &&
+        if (rawRfid.isEmpty ||
             !RegExp(r'^(?:[0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$')
                 .hasMatch(rawRfid)) {
           errors['rfid_uid'] =
-              'RFID UID must be 8, 14, or 20 uppercase hexadecimal characters (e.g. 04A1B2C3).';
+              'RFID tag UID is required for motorcycles (8, 14, or 20 uppercase hex chars).';
         }
       }
     }

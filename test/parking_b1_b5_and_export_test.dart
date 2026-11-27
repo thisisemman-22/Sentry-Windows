@@ -115,7 +115,7 @@ void main() {
       final b4Meta =
           kCampusParkingLots.firstWhere((m) => m.lotCode == 'B4');
       expect(b4Meta.resolveName([customSpace]), 'CET North Annex Lot');
-      expect(b4Meta.resolveName(const []), 'CET Building');
+      expect(b4Meta.resolveName(const []), 'CEAFA 2');
     });
 
     test('computeLotSummaries produces B1–B5 & excludes non-allocatable slots from totals', () {
@@ -164,7 +164,7 @@ void main() {
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await pumpFrameSettle(tester);
 
-      await tester.tap(find.byKey(const Key('nav_tab_parkingManagement')));
+      await tester.tap(find.byKey(const Key('nav_tab_parking')));
       await pumpFrameSettle(tester);
 
       // B1 renders unconfirmed L11/R11 + formal M4 + click B1-L1 -> Bay Inspector Drawer
@@ -193,17 +193,20 @@ void main() {
       await tester.tap(find.byKey(const Key('parking_tab_B4')));
       await pumpFrameSettle(tester);
       expect(
-        find.textContaining('Survey schematic pending'),
+        find.textContaining('Schematic pending'),
         findsWidgets,
       );
 
-      // B5 shows Overflow Zone pill & bays
+      // B5 shows Overflow Zone pill & aggregate card (no individual slots)
       await tester.ensureVisible(find.byKey(const Key('parking_tab_B5')));
       await tester.pump();
       await tester.tap(find.byKey(const Key('parking_tab_B5')));
       await pumpFrameSettle(tester);
       expect(find.text('Overflow Zone'), findsOneWidget);
-      expect(find.byKey(const Key('bay_card_B5-OF01')), findsOneWidget);
+      expect(
+        find.byKey(const Key('lot_b5_overflow_aggregate_card')),
+        findsOneWidget,
+      );
     });
   });
 
@@ -368,7 +371,9 @@ void main() {
           .switchDemoPersona(UserRole.administrator);
       await pumpFrameSettle(tester);
 
-      await tester.tap(find.byKey(const Key('nav_tab_accessLogs')));
+      await tester.tap(find.byKey(const Key('nav_tab_monitoring')));
+      await pumpFrameSettle(tester);
+      await tester.tap(find.byKey(const Key('monitoring_subtab_2')));
       await pumpFrameSettle(tester);
 
       await tester.tap(find.byKey(const Key('access_logs_export_report_button')));

@@ -132,7 +132,7 @@ void main() {
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await settle(tester);
 
-      await tester.tap(find.byKey(const Key('nav_tab_parkingManagement')));
+      await tester.tap(find.byKey(const Key('nav_tab_parking')));
       await settle(tester);
 
       expect(find.byKey(const Key('parking_tab_B1')), findsOneWidget);

@@ -876,7 +876,7 @@ class _LotBlueprintCanvasState extends State<LotBlueprintCanvas>
     );
   }
 
-  /// Schematic #4: Lot B4 — CET Building (Schematic Pending + dynamic backend grid)
+  /// Schematic #4: Lot B4 — CEAFA 2 (Camera-sensed, Schematic Pending + dynamic backend grid)
   Widget _buildLotB4SchematicPending(BuildContext context, SentryPalette p) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -884,9 +884,10 @@ class _LotBlueprintCanvasState extends State<LotBlueprintCanvas>
         const Callout(
           tone: PillTone.neutral,
           icon: Icons.architecture_outlined,
-          title: 'Lot B4 (CET) — Survey schematic pending; awaiting backend space coordinates',
+          title:
+              'Lot B4 (CEAFA 2) — Camera-sensed; Schematic pending — awaiting backend space coordinates',
           message:
-              'Once backend coordinates for CET Building spaces are published, dynamic bay cards render below automatically.',
+              'Once backend coordinates for CEAFA 2 spaces are published, dynamic camera-tracked bay cards render below automatically. Manual slot edits remain locked.',
         ),
         if (widget.lotSpaces.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -896,8 +897,45 @@ class _LotBlueprintCanvasState extends State<LotBlueprintCanvas>
     );
   }
 
-  /// Schematic #5: Lot B5 — Overflow Lot (Dynamic Grid)
+  /// Schematic #5: Lot B5 — Overflow Lot (No individual slots; aggregate zone)
   Widget _buildLotB5OverflowGrid(BuildContext context, SentryPalette p) {
+    if (!widget.lotMeta.hasIndividualSlots) {
+      return SentryCard(
+        key: const Key('lot_b5_overflow_aggregate_card'),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Callout(
+              tone: PillTone.warn,
+              icon: Icons.layers_outlined,
+              title: 'Overflow lot — no individual slots',
+              message:
+                  'Lot B5 operates as a pooled Overflow Zone without individual numbered parking bays. Priority routing spills vehicles here when Lots B1–B4 reach capacity.',
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                StatusPill(
+                  label: widget.awaitingTelemetry
+                      ? 'Overflow Zone · Awaiting telemetry'
+                      : 'Overflow Zone · Aggregate Capacity Active',
+                  tone: widget.awaitingTelemetry ? PillTone.neutral : PillTone.warn,
+                  icon: Icons.layers_outlined,
+                ),
+                StatusPill(
+                  label: 'No individual slots',
+                  tone: PillTone.neutral,
+                  icon: Icons.grid_off_outlined,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     if (widget.lotSpaces.isEmpty) {
       return const Callout(
         tone: PillTone.neutral,

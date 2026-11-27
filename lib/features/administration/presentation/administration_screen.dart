@@ -44,7 +44,30 @@ class _StagedFaceFrame {
 /// RA 10173-compliant facial recognition enrollment (`/api/v1/admin/users/{user_id}/face-enrollment`),
 /// and the system security audit trail.
 class AdministrationScreen extends ConsumerStatefulWidget {
-  const AdministrationScreen({super.key});
+  /// When non-null, renders only the requested internal sub-view without a
+  /// nested [ScreenScaffold] (used by [UsersScreen] sub-tabs).
+  /// `0 = Phase 4 Account reg`, `1 = Activation help`, `2 = Face enrollment`,
+  /// `3 = Manual User & Vehicle Registration`, `4 = Legacy drivers`.
+  final int? embeddedSubTab;
+  final VoidCallback? onOpenFaceEnrollmentTab;
+  final VoidCallback? onOpenActivationHelpTab;
+  final VoidCallback? onOpenPhase4Tab;
+  final String? initialEnrollmentUserCode;
+  final ValueChanged<String>? onProceedToFacialEnrollmentWithCode;
+  final String? externalPhase4ReceiptId;
+  final ValueChanged<String>? onPhase4ReceiptRecorded;
+
+  const AdministrationScreen({
+    super.key,
+    this.embeddedSubTab,
+    this.onOpenFaceEnrollmentTab,
+    this.onOpenActivationHelpTab,
+    this.onOpenPhase4Tab,
+    this.initialEnrollmentUserCode,
+    this.onProceedToFacialEnrollmentWithCode,
+    this.externalPhase4ReceiptId,
+    this.onPhase4ReceiptRecorded,
+  });
 
   @override
   ConsumerState<AdministrationScreen> createState() =>
@@ -83,6 +106,22 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
   String? _enrollmentErrorBanner;
   String? _enrollmentSuccessBanner;
   FaceEnrollmentStatusDto? _realFetchedEnrollment;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedEnrollmentUserCode = widget.initialEnrollmentUserCode;
+  }
+
+  @override
+  void didUpdateWidget(covariant AdministrationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final incomingCode = widget.initialEnrollmentUserCode;
+    if (incomingCode != null &&
+        incomingCode != oldWidget.initialEnrollmentUserCode) {
+      _selectedEnrollmentUserCode = incomingCode;
+    }
+  }
 
   @override
   void dispose() {
@@ -265,6 +304,8 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
       _enrollmentSuccessBanner = null;
       _adminSubTab = 2;
     });
+    widget.onProceedToFacialEnrollmentWithCode?.call(userCode);
+    widget.onOpenFaceEnrollmentTab?.call();
   }
 
   Future<void> _pickFaceImagesFromDisk() async {
@@ -458,6 +499,11 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
 
     // Immediately purge raw staged frames from client memory per RA 10173 privacy rule!
     final enrolled = response.data!;
+    ref.read(desktopOpsControllerProvider.notifier).recordFaceHistory(
+          userCode: targetUser.userCode,
+          action: 'enrolled',
+          actor: actor,
+        );
     setState(() {
       _isSubmittingEnrollment = false;
       _stagedFaceFrames.clear();
@@ -536,6 +582,11 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
       return;
     }
 
+    ref.read(desktopOpsControllerProvider.notifier).recordFaceHistory(
+          userCode: targetUser.userCode,
+          action: 'withdrawn',
+          actor: actor,
+        );
     setState(() {
       _isRevokingEnrollment = false;
       _realFetchedEnrollment = response.data;
@@ -559,6 +610,36 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
     // Strict Guard isolation: Guards never render AdministrationScreen or
     // construct any Admin-only registration/recovery providers.
     if (!isAdmin) return const SizedBox.shrink();
+
+    if (widget.embeddedSubTab != null) {
+      final mode = widget.embeddedSubTab!;
+      return switch (mode) {
+        0 => _Phase4AccountRegistrationCard(
+            onReceiptRecorded: (regId) {
+              setState(() => _lastPhase4ReceiptId = regId);
+              widget.onPhase4ReceiptRecorded?.call(regId);
+            },
+            onOpenActivationHelp: (regId) {
+              setState(() => _lastPhase4ReceiptId = regId);
+              widget.onPhase4ReceiptRecorded?.call(regId);
+              widget.onOpenActivationHelpTab?.call();
+            },
+          ),
+        1 => ActivationHelpPage(
+            initialRegistrationId:
+                widget.externalPhase4ReceiptId ?? _lastPhase4ReceiptId,
+            onSwitchToReclaim: () {
+              ref
+                  .read(registerFormControllerProvider.notifier)
+                  .setFlow(AdminRegistrationFlow.reclaimStudentOrGuard);
+              widget.onOpenPhase4Tab?.call();
+            },
+          ),
+        2 => _buildFacialEnrollmentCard(context, p, profile),
+        3 => _buildManualRegistrationCard(context, p, profile),
+        _ => _buildParticipantsCard(context, p, profile),
+      };
+    }
 
     return ScreenScaffold(
       children: [
@@ -1115,6 +1196,8 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
                 ),
                 items: const [
                   DropdownMenuItem(value: 'student', child: Text('Student')),
+                  DropdownMenuItem(value: 'faculty', child: Text('Faculty')),
+                  DropdownMenuItem(value: 'staff', child: Text('Staff')),
                   DropdownMenuItem(value: 'guard', child: Text('Guard')),
                   DropdownMenuItem(
                     value: 'administrator',
@@ -1128,6 +1211,8 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
                     if (v == 'student') {
                       _includeVehicle = true;
                       _selectedBuildingCode ??= 'CICS';
+                    } else if (v == 'faculty' || v == 'staff') {
+                      _selectedBuildingCode ??= 'CEAFA';
                     } else {
                       _selectedBuildingCode = null;
                     }
@@ -1281,7 +1366,9 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
                         controller: _rfidUidCtrl,
                         textCapitalization: TextCapitalization.characters,
                         decoration: InputDecoration(
-                          labelText: 'RFID UID (hex · for motorcycles)',
+                          labelText: _selectedVehicleType == 'motorcycle'
+                              ? 'RFID Tag UID * (required for motorcycle)'
+                              : 'RFID Tag UID (optional for car)',
                           hintText: 'e.g. 04A1B2C3',
                           errorText: _regFieldErrors['rfid_uid'],
                         ),
@@ -1565,6 +1652,7 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
     final statusTone = switch (statusDto.status) {
       'enrolled' => PillTone.ok,
       'needs_re_enrollment' => PillTone.warn,
+      'withdrawn' => PillTone.err,
       _ => PillTone.neutral,
     };
 
@@ -1641,6 +1729,40 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
                   ? 'Deleting embedding…'
                   : 'Revoke & Delete Embedding',
             ),
+          ),
+          const SizedBox(height: 16),
+          Builder(
+            builder: (context) {
+              final history = ref
+                  .watch(desktopOpsControllerProvider)
+                  .faceHistory
+                  .where((h) => h.userCode == selectedUser.userCode)
+                  .take(4)
+                  .toList();
+              if (history.isEmpty) {
+                return Text(
+                  'No recent RA 10173 consent history logged in this session.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Consent & enrollment history',
+                    style: SentryTheme.eyebrow(color: p.muted),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final h in history)
+                    KeyValueRow(
+                      label: '${h.action} (${h.consentVersion})',
+                      value:
+                          '${h.actorUserCode} · ${ManilaTime.formatDateTime(h.occurredAtUtc)}',
+                      mono: true,
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
