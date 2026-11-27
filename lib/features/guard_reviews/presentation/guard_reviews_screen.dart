@@ -485,8 +485,9 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                             'Confirmed physical crossing after Guard Review approval (${selectedItem.reviewCaseId}).',
                         actor: actor,
                       );
+                  ref.read(monitoringSubTabProvider.notifier).state = 0;
                   ref.read(selectedDesktopTabProvider.notifier).state =
-                      DesktopNavTab.liveGateMonitoring;
+                      DesktopNavTab.monitoring;
                 },
                 icon: const Icon(Icons.check_circle_rounded, size: 18),
                 label: const Text('Confirm crossed'),

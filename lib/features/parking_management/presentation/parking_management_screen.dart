@@ -8,6 +8,7 @@ import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/fixtures/synthetic_fixtures.dart';
 import '../../../shared/models/parking_models.dart';
+import '../../../shared/models/spec_2026_models.dart';
 import '../../overview/presentation/spatial_glass.dart';
 import 'lot_blueprint_canvas.dart';
 
@@ -51,9 +52,12 @@ class _ParkingManagementScreenState
     final sysState = ref.watch(sentryScenarioProvider);
     final config = ref.watch(appConfigProvider);
     final selectedTab = ref.watch(selectedParkingLotProvider);
+    final profile = ref.watch(authControllerProvider).profile;
+    final isAdmin = profile?.role.isAdmin ?? false;
 
     final isMatrix = selectedTab == 'MATRIX';
-    final activeLotCode = isMatrix ? 'B1' : selectedTab;
+    final isRules = selectedTab == 'RULES';
+    final activeLotCode = (isMatrix || isRules) ? 'B1' : selectedTab;
     final activeMeta = _metaFor(activeLotCode);
     final lotSpaces =
         sysState.spaces.where((s) => s.lotCode == activeLotCode).toList();
@@ -63,6 +67,17 @@ class _ParkingManagementScreenState
     final freeCount =
         formalSpaces.where((s) => s.isTrulyAvailableForAllocation).length;
     final zoneDisplayName = activeMeta.resolveName(sysState.spaces);
+
+    // Camera online indicator for camera-sensed lots (B2-B4).
+    final lotCamOnline = switch (activeLotCode) {
+      'B2' || 'B3' || 'B4' => sysState.devices.any((d) {
+          final loc = d.locationLabel.toUpperCase();
+          return (loc.contains(activeLotCode) ||
+                  d.deviceType.contains('camera')) &&
+              d.effectiveStatus() == 'online';
+        }),
+      _ => false,
+    };
 
     final floatingTabStrip = SpatialGlass(
       strong: true,
@@ -93,6 +108,15 @@ class _ParkingManagementScreenState
                 ref.read(selectedParkingLotProvider.notifier).state = 'MATRIX';
               },
             ),
+            const SizedBox(width: 6),
+            _LotTabPill(
+              key: const Key('parking_tab_RULES'),
+              label: 'Parking Rules',
+              selected: selectedTab == 'RULES',
+              onTap: () {
+                ref.read(selectedParkingLotProvider.notifier).state = 'RULES';
+              },
+            ),
           ],
         ),
       ),
@@ -103,7 +127,7 @@ class _ParkingManagementScreenState
         const PageIntro(
           title: 'Parking map',
           subtitle:
-              'Surveyed BatStateU Alangilan blueprints (Lots B1–B5). Click any live bay to open the Bay Inspector.',
+              'Surveyed BatStateU Alangilan blueprints (Lots B1–B5) and campus parking rules. Click any bay for Inspector details.',
         ),
         const SizedBox(height: 18),
         SentryCard(
@@ -114,19 +138,44 @@ class _ParkingManagementScreenState
               SectionHeader(
                 title: isMatrix
                     ? 'Closest parking lots by building (Lots B1–B5)'
-                    : '$activeLotCode · $zoneDisplayName',
+                    : isRules
+                        ? 'Campus Parking Rules & Hold Policy'
+                        : '$activeLotCode · $zoneDisplayName',
                 subtitle: isMatrix
                     ? 'When a driver selects a destination building in the mobile app, SENTRY checks lots in this order (B5 is Overflow).'
-                    : (awaitingTelemetry
-                        ? '${activeMeta.dimensionsNote} · Clean schematic wireframe (awaiting live camera telemetry)'
-                        : '$freeCount of ${formalSpaces.length} formal bays free · ${activeMeta.dimensionsNote}'),
-                trailing: isMatrix
+                    : isRules
+                        ? (isAdmin
+                            ? 'View and edit parking hold windows, overflow routing, and operating rules. Changes are audited.'
+                            : 'Read-only campus parking policy rules.')
+                        : (awaitingTelemetry
+                            ? '${activeMeta.dimensionsNote} · Clean schematic wireframe (awaiting live camera telemetry)'
+                            : activeMeta.hasIndividualSlots
+                                ? '$freeCount of ${formalSpaces.length} formal bays free · ${activeMeta.dimensionsNote}'
+                                : 'Overflow pooled capacity · No individual slots'),
+                trailing: (isMatrix || isRules)
                     ? null
                     : Wrap(
                         spacing: 8,
                         runSpacing: 6,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          if (activeMeta.manualEditLocked &&
+                              activeMeta.hasIndividualSlots)
+                            StatusPill(
+                              label: lotCamOnline
+                                  ? 'Camera Online · Locked'
+                                  : 'Camera Offline · Locked',
+                              tone: lotCamOnline ? PillTone.ok : PillTone.warn,
+                              icon: lotCamOnline
+                                  ? Icons.videocam_outlined
+                                  : Icons.videocam_off_outlined,
+                            )
+                          else if (!activeMeta.manualEditLocked)
+                            const StatusPill(
+                              label: 'Manual Control (Admin)',
+                              tone: PillTone.info,
+                              icon: Icons.tune_rounded,
+                            ),
                           if (activeMeta.isOverflow)
                             const StatusPill(
                               label: 'Overflow Zone',
@@ -149,24 +198,26 @@ class _ParkingManagementScreenState
                     switchKey: selectedTab,
                     child: isMatrix
                         ? _buildBuildingPriorityMatrix(context)
-                        : LotBlueprintCanvas(
-                            lotMeta: activeMeta,
-                            lotSpaces: lotSpaces,
-                            selectedSpaceCode: _selectedSpaceCode,
-                            awaitingTelemetry: awaitingTelemetry,
-                            topInset: 74.0,
-                            onRetryTelemetry: () {
-                              ref
-                                  .read(sentryScenarioProvider.notifier)
-                                  .refreshRealSnapshot();
-                            },
-                            onSelectSpace: (space) {
-                              setState(() =>
-                                  _selectedSpaceCode = space.spaceCode);
-                              _openBayInspectorDrawer(
-                                  context, space.spaceCode);
-                            },
-                          ),
+                        : isRules
+                            ? _buildParkingRulesView(context, isAdmin)
+                            : LotBlueprintCanvas(
+                                lotMeta: activeMeta,
+                                lotSpaces: lotSpaces,
+                                selectedSpaceCode: _selectedSpaceCode,
+                                awaitingTelemetry: awaitingTelemetry,
+                                topInset: 74.0,
+                                onRetryTelemetry: () {
+                                  ref
+                                      .read(sentryScenarioProvider.notifier)
+                                      .refreshRealSnapshot();
+                                },
+                                onSelectSpace: (space) {
+                                  setState(() =>
+                                      _selectedSpaceCode = space.spaceCode);
+                                  _openBayInspectorDrawer(
+                                      context, space.spaceCode);
+                                },
+                              ),
                   ),
                   // Floating Translucent Lot Tabs kept OUTSIDE SmoothSwitcher so keys
                   // remain strictly unique during cross-fade transitions.
@@ -210,6 +261,9 @@ class _ParkingManagementScreenState
           }
           final isMoto = space.compatibility == 'motorcycle_only';
           final isMock = ref.watch(appConfigProvider).isMock;
+          final actor = ref.watch(authControllerProvider).profile;
+          final isAdmin = actor?.role.isAdmin ?? false;
+          final lotMeta = _metaFor(space.lotCode);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -379,8 +433,86 @@ class _ParkingManagementScreenState
                     mono: true,
                   ),
               ],
-              if (isMock) ...[
+              if (!lotMeta.manualEditLocked) ...[
                 const SizedBox(height: 18),
+                if (isAdmin && actor != null)
+                  SentryCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SectionHeader(
+                          title: 'Lot B1 (CIT) manual slot controls',
+                          subtitle:
+                              'Administrator-only overrides for manually tracked bays.',
+                        ),
+                        const SizedBox(height: 8),
+                        Material(
+                          type: MaterialType.transparency,
+                          child: SwitchListTile(
+                            key: Key('b1_slot_active_switch_${space.spaceCode}'),
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Slot Active (Allocatable)'),
+                            value: space.isBayActive,
+                            onChanged: (val) {
+                              ref
+                                  .read(sentryScenarioProvider.notifier)
+                                  .toggleLotB1SpaceManual(
+                                    spaceCode: space.spaceCode,
+                                    actor: actor,
+                                    isBayActive: val,
+                                  );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          key: Key(
+                              'b1_manual_status_toggle_${space.spaceCode}'),
+                          onPressed: () {
+                            final nextStatus =
+                                space.physicalStatus == 'vacant'
+                                    ? 'occupied'
+                                    : 'vacant';
+                            ref
+                                .read(sentryScenarioProvider.notifier)
+                                .toggleLotB1SpaceManual(
+                                  spaceCode: space.spaceCode,
+                                  actor: actor,
+                                  physicalStatus: nextStatus,
+                                );
+                          },
+                          icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                          label: Text(
+                            space.physicalStatus == 'vacant'
+                                ? 'Mark Manually Occupied'
+                                : 'Mark Manually Available',
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  const Callout(
+                    tone: PillTone.neutral,
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Read-only bay view',
+                    message:
+                        'Guards monitor bay occupancy in read-only mode. Only Administrators can adjust Lot B1 manual bays.',
+                  ),
+              ] else ...[
+                const SizedBox(height: 18),
+                const Callout(
+                  key: Key('camera_locked_slot_notice'),
+                  tone: PillTone.info,
+                  icon: Icons.videocam_outlined,
+                  title: 'Camera-sensed lot — manual slot edits are locked',
+                  message:
+                      'Lots B2–B4 are tracked automatically by overhead vision telemetry and cannot be manually toggled.',
+                ),
+              ],
+              if (isMock && lotMeta.lotCode == 'B1' && isAdmin) ...[
+                const SizedBox(height: 12),
                 OutlinedButton.icon(
                   key: const Key('cycle_bay_physical_status_btn'),
                   onPressed: () {
@@ -397,6 +529,147 @@ class _ParkingManagementScreenState
         },
       ),
     );
+  }
+
+  Widget _buildParkingRulesView(BuildContext context, bool isAdmin) {
+    final p = SentryPalette.of(context);
+    final ops = ref.watch(desktopOpsControllerProvider);
+    final actor = ref.watch(authControllerProvider).profile;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 76, 22, 22),
+      decoration: BoxDecoration(
+        color: p.subtle.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: p.line, width: 1.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (ops.parkingRules.isEmpty)
+            const EmptyState(
+              icon: Icons.gavel_rounded,
+              title: 'No parking rules loaded',
+              message:
+                  'Live campus parking rules will load here when synced from FastAPI.',
+            )
+          else
+            for (var i = 0; i < ops.parkingRules.length; i++) ...[
+              if (i > 0) Divider(color: p.line, height: 22),
+              _buildRuleRow(context, p, ops.parkingRules[i], isAdmin, actor),
+            ],
+          if (ops.parkingRuleHistory.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const SectionHeader(
+              title: 'Rule change history',
+              subtitle: 'Audited edits to campus parking rules.',
+            ),
+            const SizedBox(height: 10),
+            for (final ch in ops.parkingRuleHistory.take(10))
+              KeyValueRow(
+                label: '${ch.ruleTitle} (${ch.actorUserCode})',
+                value:
+                    '${ch.previousValue} -> ${ch.newValue} · ${ManilaTime.formatDateTime(ch.changedAtUtc)}',
+                mono: true,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRuleRow(
+    BuildContext context,
+    SentryPalette p,
+    ParkingRuleDto rule,
+    bool isAdmin,
+    dynamic actor,
+  ) {
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(rule.title, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                rule.description,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: p.muted),
+              ),
+            ],
+          ),
+        ),
+        Wrap(
+          spacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            StatusPill(
+              label: rule.valueText,
+              tone: PillTone.info,
+              monospace: true,
+            ),
+            if (isAdmin && actor != null)
+              OutlinedButton.icon(
+                key: Key('edit_parking_rule_${rule.ruleKey}'),
+                onPressed: () => _openEditRuleDialog(context, rule, actor),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEditRuleDialog(
+    BuildContext context,
+    ParkingRuleDto rule,
+    dynamic actor,
+  ) async {
+    final ctrl = TextEditingController(text: rule.valueText);
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Update ${rule.title}'),
+        content: SizedBox(
+          width: 420,
+          child: TextField(
+            key: Key('parking_rule_value_field_${rule.ruleKey}'),
+            controller: ctrl,
+            decoration: const InputDecoration(
+              labelText: 'Rule value',
+              hintText: 'Enter updated rule setting',
+            ),
+          ),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: Key('parking_rule_save_${rule.ruleKey}'),
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (updated == null || updated.isEmpty || !mounted) return;
+    await ref.read(desktopOpsControllerProvider.notifier).updateParkingRule(
+          ruleKey: rule.ruleKey,
+          valueText: updated,
+          actor: actor,
+        );
   }
 
   Widget _buildBuildingPriorityMatrix(BuildContext context) {

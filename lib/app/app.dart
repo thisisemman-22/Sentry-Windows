@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/motion/motion.dart';
 import '../core/theme/sentry_theme.dart';
 import '../core/widgets/sentry_interactive_logo.dart';
+import '../features/authentication/presentation/first_login_password_screen.dart';
 import '../features/authentication/presentation/login_screen.dart';
 import 'desktop_shell.dart';
 import 'providers.dart';
@@ -52,7 +53,11 @@ class SentryDesktopApp extends ConsumerWidget {
                   wsBaseUrl: config.wsBaseUrl,
                 )
               : authState.isAuthenticated
-                  ? const DesktopShell(key: ValueKey('shell'))
+                  ? (authState.session!.firstLoginRequired
+                      ? const FirstLoginPasswordScreen(
+                          key: ValueKey('first_login_password_screen'),
+                        )
+                      : const DesktopShell(key: ValueKey('shell')))
                   : const LoginScreen(key: ValueKey('login')),
         ),
       ),

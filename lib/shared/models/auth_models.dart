@@ -244,6 +244,7 @@ class TokenPairData {
   final String tokenType;
   final DateTime accessExpiresAtUtc;
   final DateTime refreshExpiresAtUtc;
+  final bool firstLoginRequired;
 
   const TokenPairData({
     required this.accessToken,
@@ -251,6 +252,7 @@ class TokenPairData {
     required this.tokenType,
     required this.accessExpiresAtUtc,
     required this.refreshExpiresAtUtc,
+    this.firstLoginRequired = false,
   });
 
   factory TokenPairData.fromStrictJson(Object? raw) {
@@ -264,6 +266,7 @@ class TokenPairData {
         'access_expires_at',
         'refresh_expires_at',
       },
+      optionalKeys: const {'first_login_required'},
       schemaName: 'TokenPairData',
     );
     final accessToken = requireString(map, 'access_token', 'TokenPairData');
@@ -272,6 +275,12 @@ class TokenPairData {
     if (tokenType != 'bearer') {
       throw ContractViolation(
         'TokenPairData.token_type must equal "bearer", got "$tokenType".',
+      );
+    }
+    final rawFirstLogin = map['first_login_required'];
+    if (rawFirstLogin != null && rawFirstLogin is! bool) {
+      throw const ContractViolation(
+        'TokenPairData.first_login_required must be a boolean.',
       );
     }
     return TokenPairData(
@@ -284,6 +293,7 @@ class TokenPairData {
         map['refresh_expires_at'],
         'TokenPairData.refresh_expires_at',
       ),
+      firstLoginRequired: rawFirstLogin == true,
     );
   }
 
@@ -358,7 +368,8 @@ class ProfileVehicleData {
   }
 }
 
-/// Phase 4 Response DTO: 7-field `ProfileData` allowlist (`GET /api/v1/me`).
+/// Phase 4 Response DTO: 7-field `ProfileData` allowlist (`GET /api/v1/me`)
+/// plus optional `first_login_required`.
 class ProfileData {
   final String id;
   final String displayCode;
@@ -367,6 +378,7 @@ class ProfileData {
   final BuildingData? building;
   final String? email;
   final List<ProfileVehicleData> authorizedVehicles;
+  final bool firstLoginRequired;
 
   const ProfileData({
     required this.id,
@@ -376,6 +388,7 @@ class ProfileData {
     required this.building,
     required this.email,
     required this.authorizedVehicles,
+    this.firstLoginRequired = false,
   });
 
   factory ProfileData.fromStrictJson(Object? raw) {
@@ -391,6 +404,7 @@ class ProfileData {
         'email',
         'authorized_vehicles',
       },
+      optionalKeys: const {'first_login_required'},
       schemaName: 'ProfileData',
     );
     final rawBuilding = map['building'];
@@ -405,6 +419,12 @@ class ProfileData {
         'ProfileData.authorized_vehicles exceeds maxItems 20.',
       );
     }
+    final rawFirstLogin = map['first_login_required'];
+    if (rawFirstLogin != null && rawFirstLogin is! bool) {
+      throw const ContractViolation(
+        'ProfileData.first_login_required must be a boolean.',
+      );
+    }
     return ProfileData(
       id: requireUuid(map, 'id', 'ProfileData'),
       displayCode: requireString(map, 'display_code', 'ProfileData'),
@@ -414,6 +434,7 @@ class ProfileData {
       email: requireNullableString(map, 'email', 'ProfileData'),
       authorizedVehicles:
           rawVehicles.map(ProfileVehicleData.fromStrictJson).toList(),
+      firstLoginRequired: rawFirstLogin == true,
     );
   }
 }
@@ -557,6 +578,7 @@ class ProfileDto {
   final String? email;
   final BuildingData? building;
   final List<ProfileVehicleData> authorizedVehicles;
+  final bool firstLoginRequired;
 
   const ProfileDto({
     required this.userId,
@@ -569,9 +591,35 @@ class ProfileDto {
     this.email,
     this.building,
     this.authorizedVehicles = const [],
+    this.firstLoginRequired = false,
   });
 
-  factory ProfileDto.fromProfileData(ProfileData data) {
+  ProfileDto copyWith({
+    String? fullName,
+    String? assignedStation,
+    bool? isActive,
+    String? email,
+    bool? firstLoginRequired,
+  }) {
+    return ProfileDto(
+      userId: userId,
+      userCode: userCode,
+      username: username,
+      fullName: fullName ?? this.fullName,
+      role: role,
+      assignedStation: assignedStation ?? this.assignedStation,
+      isActive: isActive ?? this.isActive,
+      email: email ?? this.email,
+      building: building,
+      authorizedVehicles: authorizedVehicles,
+      firstLoginRequired: firstLoginRequired ?? this.firstLoginRequired,
+    );
+  }
+
+  factory ProfileDto.fromProfileData(
+    ProfileData data, {
+    bool forceFirstLogin = false,
+  }) {
     return ProfileDto(
       userId: data.id,
       userCode: data.displayCode,
@@ -584,6 +632,7 @@ class ProfileDto {
       email: data.email,
       building: data.building,
       authorizedVehicles: data.authorizedVehicles,
+      firstLoginRequired: data.firstLoginRequired || forceFirstLogin,
     );
   }
 
@@ -601,6 +650,7 @@ class ProfileDto {
           json['assigned_station']?.toString() ?? 'Gate 1 Guardhouse',
       isActive: json['is_active'] != false,
       email: json['email']?.toString(),
+      firstLoginRequired: json['first_login_required'] == true,
     );
   }
 
@@ -613,6 +663,7 @@ class ProfileDto {
         'assigned_station': assignedStation,
         'is_active': isActive,
         if (email != null) 'email': email,
+        if (firstLoginRequired) 'first_login_required': true,
       };
 }
 
@@ -637,6 +688,8 @@ class SessionDto {
     required this.profile,
   });
 
+  bool get firstLoginRequired => profile.firstLoginRequired;
+
   factory SessionDto.fromTokenPairAndProfile(
     TokenPairData pair,
     ProfileData profile,
@@ -649,7 +702,10 @@ class SessionDto {
       issuedAtUtc: DateTime.now().toUtc(),
       expiresAtUtc: pair.accessExpiresAtUtc,
       refreshExpiresAtUtc: pair.refreshExpiresAtUtc,
-      profile: ProfileDto.fromProfileData(profile),
+      profile: ProfileDto.fromProfileData(
+        profile,
+        forceFirstLogin: pair.firstLoginRequired,
+      ),
     );
   }
 

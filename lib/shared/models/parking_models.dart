@@ -39,6 +39,8 @@ class ParkingLotZoneMeta {
   final String dimensionsNote;
   final bool isOverflow;
   final bool isSchematicPending;
+  final bool manualEditLocked;
+  final bool hasIndividualSlots;
 
   const ParkingLotZoneMeta({
     required this.lotCode,
@@ -48,6 +50,8 @@ class ParkingLotZoneMeta {
     required this.dimensionsNote,
     this.isOverflow = false,
     this.isSchematicPending = false,
+    this.manualEditLocked = false,
+    this.hasIndividualSlots = true,
   });
 
   /// Prefers backend `parking_zones.name` (`SpaceDto.zoneName`) if present.
@@ -66,40 +70,50 @@ class ParkingLotZoneMeta {
 const List<ParkingLotZoneMeta> kCampusParkingLots = [
   ParkingLotZoneMeta(
     lotCode: 'B1',
-    defaultName: 'Albert Einstein / CEAFA Left',
-    shortTabLabel: 'B1 · CEAFA Left',
-    nearestLandmark: 'Albert Einstein / CEAFA Left Wing',
-    dimensionsNote: '2.4m × 5.0m bays · 27 confirmed + 2 unconfirmed far-end',
+    defaultName: 'CIT',
+    shortTabLabel: 'B1 · CIT',
+    nearestLandmark: 'College of Industrial Technology (CIT)',
+    dimensionsNote: '2.4m × 5.0m bays · 27 confirmed + 2 unconfirmed far-end (manual edits enabled)',
+    manualEditLocked: false,
+    hasIndividualSlots: true,
   ),
   ParkingLotZoneMeta(
     lotCode: 'B2',
-    defaultName: 'Gymnasium & STEER Hub',
-    shortTabLabel: 'B2 · Gym & STEER',
-    nearestLandmark: 'Gov. Feliciano Leviste Gym & STEER Hub',
-    dimensionsNote: '10 motorcycle strip + 18 car bays + 4 informal aisle',
+    defaultName: 'GYM',
+    shortTabLabel: 'B2 · GYM',
+    nearestLandmark: 'Gov. Feliciano Leviste Gymnasium',
+    dimensionsNote: 'Camera-sensed · 10 motorcycle strip + 18 car bays + 4 informal aisle',
+    manualEditLocked: true,
+    hasIndividualSlots: true,
   ),
   ParkingLotZoneMeta(
     lotCode: 'B3',
-    defaultName: 'Albert Einstein / CEAFA Right',
-    shortTabLabel: 'B3 · CEAFA Right',
-    nearestLandmark: 'Albert Einstein / CEAFA Right Wing',
-    dimensionsNote: '20 formal bays (incl. PWD R10 & center C1) + 3 informal aisle',
+    defaultName: 'CEAFA 1 (Tapat ng Gym)',
+    shortTabLabel: 'B3 · CEAFA 1',
+    nearestLandmark: 'CEAFA 1 (Tapat ng Gym)',
+    dimensionsNote: 'Camera-sensed · 20 formal bays (incl. PWD R10 & center C1) + 3 informal aisle',
+    manualEditLocked: true,
+    hasIndividualSlots: true,
   ),
   ParkingLotZoneMeta(
     lotCode: 'B4',
-    defaultName: 'CET Building',
-    shortTabLabel: 'B4 · CET',
-    nearestLandmark: 'College of Engineering & Technology (CET)',
-    dimensionsNote: 'Survey schematic pending · dynamic bay rendering when live',
+    defaultName: 'CEAFA 2',
+    shortTabLabel: 'B4 · CEAFA 2',
+    nearestLandmark: 'CEAFA 2 Building',
+    dimensionsNote: 'Camera-sensed · schematic pending awaiting backend space coordinates',
     isSchematicPending: true,
+    manualEditLocked: true,
+    hasIndividualSlots: true,
   ),
   ParkingLotZoneMeta(
     lotCode: 'B5',
-    defaultName: 'Overflow Lot',
+    defaultName: 'Overflow',
     shortTabLabel: 'B5 · Overflow',
     nearestLandmark: 'Campus Overflow Parking Zone',
-    dimensionsNote: 'Designated overflow lot for peak campus demand',
+    dimensionsNote: 'Overflow lot — aggregate capacity only (no individual slots)',
     isOverflow: true,
+    manualEditLocked: true,
+    hasIndividualSlots: false,
   ),
 ];
 
@@ -132,6 +146,7 @@ class SpaceDto {
   final String? assignedUserCode;
   final DateTime? holdExpiresAtUtc;
   final Map<String, int> buildingDistanceMeters;
+  final bool isBayActive;
 
   const SpaceDto({
     required this.spaceId,
@@ -156,6 +171,7 @@ class SpaceDto {
     this.assignedUserCode,
     this.holdExpiresAtUtc,
     this.buildingDistanceMeters = const {},
+    this.isBayActive = true,
   });
 
   String get displaySlotLabel =>
@@ -169,11 +185,12 @@ class SpaceDto {
 
   bool get isInformalAisle => slotCategory == SpaceSlotCategory.informalAisle;
 
-  /// True ONLY for confirmed formal bays when camera feed is fresh,
+  /// True ONLY for confirmed active formal bays when camera feed is fresh,
   /// physical status is `available`, and allocation status is `unassigned`.
-  /// `unknown`, `isStale`, `unconfirmedFarEnd`, and `informalAisle` slots
-  /// are NEVER treated as allocatable free capacity!
+  /// `unknown`, `isStale`, `unconfirmedFarEnd`, `informalAisle`, and disabled
+  /// bays are NEVER treated as allocatable free capacity!
   bool get isTrulyAvailableForAllocation =>
+      isBayActive &&
       isFormalAllocatableBay &&
       !isStale &&
       physicalStatus == 'available' &&
@@ -213,6 +230,7 @@ class SpaceDto {
     String? assignedVehicleCode,
     String? assignedUserCode,
     DateTime? holdExpiresAtUtc,
+    bool? isBayActive,
   }) {
     return SpaceDto(
       spaceId: spaceId,
@@ -242,6 +260,7 @@ class SpaceDto {
       holdExpiresAtUtc:
           clearAssignment ? null : (holdExpiresAtUtc ?? this.holdExpiresAtUtc),
       buildingDistanceMeters: buildingDistanceMeters,
+      isBayActive: isBayActive ?? this.isBayActive,
     );
   }
 
@@ -284,6 +303,7 @@ class SpaceDto {
           ? DateTime.tryParse(json['hold_expires_at'].toString())?.toUtc()
           : null,
       buildingDistanceMeters: distMap,
+      isBayActive: json['is_active'] != false,
     );
   }
 
@@ -297,6 +317,7 @@ class SpaceDto {
         if (isPartlyOutOfView) 'is_partly_out_of_view': true,
         if (isFarEnd) 'is_far_end': true,
         if (zoneName != null) 'zone_name': zoneName,
+        'is_active': isBayActive,
         'compatibility': compatibility,
         'physical_status': physicalStatus,
         'allocation_status': allocationStatus,

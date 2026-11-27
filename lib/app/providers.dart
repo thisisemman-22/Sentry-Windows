@@ -7,6 +7,8 @@ import '../core/network/phase4_contract.dart';
 import '../core/network/secure_session_store.dart';
 import '../core/network/ws_client.dart';
 import '../features/access_logs/data/access_logs_repository.dart';
+import '../features/admin_ops/data/desktop_ops_repository.dart';
+import '../features/admin_ops/state/desktop_ops_controller.dart';
 import '../features/administration/data/admin_registration_api.dart';
 import '../features/administration/data/administration_repository.dart';
 import '../features/administration/state/register_form_controller.dart';
@@ -127,6 +129,10 @@ final accessLogsRepositoryProvider = Provider<AccessLogsRepository>((ref) {
 final deviceMonitoringRepositoryProvider =
     Provider<DeviceMonitoringRepository>((ref) {
   return DeviceMonitoringRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final desktopOpsRepositoryProvider = Provider<DesktopOpsRepository>((ref) {
+  return RealDesktopOpsRepository(apiClient: ref.watch(apiClientProvider));
 });
 
 /// Lazy Administrator-only Phase 4 registration API & form controller.
@@ -392,16 +398,27 @@ class AuthController extends StateNotifier<AuthState> {
 
     // Mock / Developer Test Mode authentication
     ProfileDto? matchedProfile;
-    if ((normalizedLower == 'guard01@sentry.test' ||
+    final bool forceFirstLogin = password == 'SENTRY-WELCOME-2026!';
+    if ((normalizedLower == 'firstlogin@sentry.test' ||
+            normalizedLower == 'newguard@sentry.test') &&
+        password.length >= 4) {
+      matchedProfile = SentryFixtures.guardOperator.copyWith(
+        firstLoginRequired: true,
+      );
+    } else if ((normalizedLower == 'guard01@sentry.test' ||
             normalizedLower == 'guard01' ||
             normalizedLower == 'g001') &&
         password.length >= 4) {
-      matchedProfile = SentryFixtures.guardOperator;
+      matchedProfile = SentryFixtures.guardOperator.copyWith(
+        firstLoginRequired: forceFirstLogin,
+      );
     } else if ((normalizedLower == 'admin01@sentry.test' ||
             normalizedLower == 'admin01' ||
             normalizedLower == 'a001') &&
         password.length >= 4) {
-      matchedProfile = SentryFixtures.adminOperator;
+      matchedProfile = SentryFixtures.adminOperator.copyWith(
+        firstLoginRequired: forceFirstLogin,
+      );
     }
 
     if (matchedProfile == null) {
@@ -545,6 +562,66 @@ class AuthController extends StateNotifier<AuthState> {
     return ApiEnvelope.success(true, requestId: 'mock-pwd-change-200');
   }
 
+  /// Completes forced first-login password setup (`first_login_required == true`)
+  /// with matching validation, clearing the flag so the operator enters [DesktopShell].
+  Future<ApiEnvelope<bool>> completeFirstLoginPassword({
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    if (newPassword != confirmPassword) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message: 'Both password fields must match exactly.',
+        httpStatus: 400,
+      );
+    }
+    final policyErr = validatePasswordPolicy(newPassword);
+    if (policyErr != null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.passwordPolicyRejected,
+        message: policyErr,
+        httpStatus: 400,
+      );
+    }
+    if (newPassword == 'SENTRY-WELCOME-2026!') {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.passwordPolicyRejected,
+        message: 'New password cannot reuse the General Password.',
+        httpStatus: 400,
+      );
+    }
+
+    final current = state.session;
+    if (current == null) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.authenticationRequired,
+        message: 'Operator session unavailable.',
+        httpStatus: 401,
+      );
+    }
+
+    if (config.isReal && authRepository != null) {
+      // TODO(API): confirm dedicated /api/v1/auth/first-login/password if separate from /password/change
+      final res = await authRepository!.changePassword(
+        PasswordChangeRequest(
+          currentPassword: 'SENTRY-WELCOME-2026!',
+          newPassword: newPassword,
+        ),
+      );
+      if (!res.ok) return res;
+    }
+
+    final updatedSession = current.copyWith(
+      profile: current.profile.copyWith(firstLoginRequired: false),
+    );
+    await sessionStore.saveSession(updatedSession);
+    state = state.copyWith(
+      session: updatedSession,
+      clearError: true,
+    );
+    return ApiEnvelope.success(true, requestId: 'first-login-complete');
+  }
+
   /// Handles HTTP 401 refresh failure or WebSocket 1008 session expiration.
   Future<void> expireSessionWith1008([String? reason]) async {
     await sessionStore.clearSession();
@@ -570,12 +647,16 @@ final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
     onSessionCleared: () {
       ref.read(devModeUnlockedProvider.notifier).state = false;
       ref.read(selectedDesktopTabProvider.notifier).state =
-          DesktopNavTab.overview;
+          DesktopNavTab.dashboard;
+      ref.read(monitoringSubTabProvider.notifier).state = 0;
+      ref.read(usersSubTabProvider.notifier).state = 0;
       ref.read(sentryScenarioProvider.notifier).resetToProductionRealMode();
+      ref.read(desktopOpsControllerProvider.notifier).resetToProductionRealMode();
     },
     onUnlockDevMode: () {
       ref.read(devModeUnlockedProvider.notifier).state = true;
       ref.read(sentryScenarioProvider.notifier).enableDeveloperMockMode();
+      ref.read(desktopOpsControllerProvider.notifier).enableDeveloperMockMode();
     },
     onDifferentAccountSignedIn: () {
       if (ref.exists(registerFormControllerProvider)) {
@@ -618,39 +699,79 @@ final StateNotifierProvider<SentryScenarioController, SentrySystemState>
   return controller;
 });
 
-/// Currently selected Desktop Navigation View (Views 2–8 inside authenticated shell).
-/// [title] is the short sidebar label; [subtitle] is the one-line page intro.
+final StateNotifierProvider<DesktopOpsController, DesktopOpsState>
+    desktopOpsControllerProvider =
+    StateNotifierProvider<DesktopOpsController, DesktopOpsState>((ref) {
+  final config = ref.read(appConfigProvider);
+  final repo = ref.watch(desktopOpsRepositoryProvider);
+  final controller = DesktopOpsController(
+    dataSourceMode: config.dataSource,
+    repository: repo,
+    onAppendAudit: (log) {
+      ref.read(sentryScenarioProvider.notifier).appendAuditLog(log);
+    },
+  );
+  ref.listen<AppConfig>(appConfigProvider, (prev, next) {
+    if (next.isMock && prev?.isReal == true) {
+      controller.enableDeveloperMockMode();
+    } else if (next.isReal && prev?.isMock == true) {
+      controller.resetToProductionRealMode();
+    }
+  });
+  return controller;
+});
+
+/// Updated 10-Section SENTRY Desktop Navigation (2026-11-27 Spec).
 enum DesktopNavTab {
-  overview('Overview', 'How campus parking looks right now.',
-      Icons.space_dashboard_outlined, Icons.space_dashboard_rounded),
-  liveGateMonitoring('Live Gates', 'Vehicles at the gates, as they arrive.',
-      Icons.videocam_outlined, Icons.videocam_rounded),
-  guardReviews('Reviews', 'Cases the system wasn\'t sure about.',
-      Icons.fact_check_outlined, Icons.fact_check_rounded),
-  parkingManagement('Parking', 'Every bay across Lots B1 to B5.',
-      Icons.local_parking_outlined, Icons.local_parking_rounded),
-  accessLogs('Access Logs', 'Search entries, exits and registered vehicles.',
-      Icons.receipt_long_outlined, Icons.receipt_long_rounded),
-  deviceMonitoring('Devices', 'Cameras, readers and sensors on site.',
-      Icons.router_outlined, Icons.router_rounded),
-  administration('Administration', 'Accounts, vehicles and the audit trail.',
-      Icons.admin_panel_settings_outlined, Icons.admin_panel_settings_rounded);
+  dashboard('Dashboard', 'How campus parking looks right now.',
+      Icons.space_dashboard_outlined, Icons.space_dashboard_rounded, false),
+  users('Users', 'Accounts, registration, face enrollment & password resets.',
+      Icons.people_outline_rounded, Icons.people_rounded, true),
+  vehiclesRfid('Vehicles & RFID', 'Vehicles, user requests & RFID inventory.',
+      Icons.directions_car_outlined, Icons.directions_car_rounded, true),
+  parking('Parking', 'Lots B1–B5 blueprints, status & parking rules.',
+      Icons.local_parking_outlined, Icons.local_parking_rounded, false),
+  guests('Guests', 'Guest visit approvals, accounts & overdue stays.',
+      Icons.badge_outlined, Icons.badge_rounded, true),
+  monitoring('Monitoring', 'Live gates, reviews, entries/exits & hardware.',
+      Icons.videocam_outlined, Icons.videocam_rounded, false),
+  reports('Reports', 'Preset reports, masked previews & CSV/PDF exports.',
+      Icons.analytics_outlined, Icons.analytics_rounded, false),
+  announcements('Announcements', 'Member notices pushed to mobile app.',
+      Icons.campaign_outlined, Icons.campaign_rounded, true),
+  audit('Audit', 'Searchable security and administrative audit trail.',
+      Icons.policy_outlined, Icons.policy_rounded, true),
+  settings('Settings', 'Read-only backend security & system configuration.',
+      Icons.settings_outlined, Icons.settings_rounded, true);
 
   final String title;
   final String subtitle;
   final IconData icon;
   final IconData selectedIcon;
-  const DesktopNavTab(this.title, this.subtitle, this.icon, this.selectedIcon);
+  final bool isAdminOnly;
+  const DesktopNavTab(
+    this.title,
+    this.subtitle,
+    this.icon,
+    this.selectedIcon,
+    this.isAdminOnly,
+  );
 }
 
 final selectedDesktopTabProvider = StateProvider<DesktopNavTab>((ref) {
-  return DesktopNavTab.overview;
+  return DesktopNavTab.dashboard;
 });
 
-/// Currently selected campus lot tab in View 5 (`'B1'..'B5'` or `'MATRIX'`).
+/// Active sub-tab inside View 6 `Monitoring`
+/// (0: Live Gates, 1: Review Cases, 2: Entries & Exits, 3: Cameras & Devices, 4: Guard Accounts [Admin Only]).
+final monitoringSubTabProvider = StateProvider<int>((ref) => 0);
+
+/// Active sub-tab inside View 2 `Users` (Admin Only)
+/// (0: Directory, 1: Register User, 2: Face Enrollment, 3: Phase 4 OTP & Activation).
+final usersSubTabProvider = StateProvider<int>((ref) => 0);
+
+/// Currently selected campus lot tab in Parking (`'B1'..'B5'`, `'MATRIX'`, `'RULES'`).
 final selectedParkingLotProvider = StateProvider<String>((ref) => 'B1');
 
-/// Lane currently focused on the Live Gates page
-/// (`lane-car-in` | `lane-moto-in` | `lane-car-out` | `lane-moto-out`).
-/// Demo scenarios set this so the operator lands on the relevant lane.
+/// Lane currently focused on Live Gates (`lane-car-in` | `lane-car-out` | `lane-moto-in` | `lane-moto-out`).
 final focusedLaneProvider = StateProvider<String>((ref) => 'lane-car-in');

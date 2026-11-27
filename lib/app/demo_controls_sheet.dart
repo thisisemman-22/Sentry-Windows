@@ -242,10 +242,10 @@ class _ScenarioTile extends ConsumerWidget {
       onTap: () {
         ref.read(sentryScenarioProvider.notifier).triggerScenario(scenario.code);
         ref.read(focusedLaneProvider.notifier).state = scenario.lane;
+        ref.read(monitoringSubTabProvider.notifier).state =
+            scenario.code == 'T13' ? 1 : 0;
         ref.read(selectedDesktopTabProvider.notifier).state =
-            scenario.code == 'T13'
-                ? DesktopNavTab.guardReviews
-                : DesktopNavTab.liveGateMonitoring;
+            DesktopNavTab.monitoring;
         Navigator.of(context).maybePop();
       },
       child: Row(

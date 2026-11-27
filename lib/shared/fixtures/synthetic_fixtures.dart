@@ -410,7 +410,7 @@ class SentryFixtures {
     }
 
     // -------------------------------------------------------------------------
-    // LOT B1 — Albert Einstein / CEAFA Left (27 Confirmed + 2 Unconfirmed = 29)
+    // LOT B1 — CIT (27 Confirmed + 2 Unconfirmed = 29)
     // -------------------------------------------------------------------------
     const b1Dist = {'CEAFA': 24, 'CICS': 45, 'REGISTRAR': 65, 'STEERHUB': 90};
     for (var i = 1; i <= 11; i++) {
@@ -550,7 +550,7 @@ class SentryFixtures {
     }
 
     // -------------------------------------------------------------------------
-    // LOT B2 — Gymnasium & STEER Hub (32 Mapped: 10 Moto + 18 Car + 4 Aisle)
+    // LOT B2 — GYM (32 Mapped: 10 Moto + 18 Car + 4 Aisle)
     // -------------------------------------------------------------------------
     const b2Dist = {'STEERHUB': 22, 'FITNESS CENTER': 18, 'CEAFA': 85, 'CET': 95};
     for (var i = 1; i <= 10; i++) {
@@ -631,7 +631,7 @@ class SentryFixtures {
     }
 
     // -------------------------------------------------------------------------
-    // LOT B3 — Albert Einstein / CEAFA Right (20 Formal + 3 Informal = 23)
+    // LOT B3 — CEAFA 1 (Tapat ng Gym) (20 Formal + 3 Informal = 23)
     // -------------------------------------------------------------------------
     const b3Dist = {'CEAFA': 26, 'CICS': 32, 'RGR': 55, 'REGISTRAR': 68};
     for (var i = 1; i <= 9; i++) {
@@ -698,7 +698,7 @@ class SentryFixtures {
     }
 
     // -------------------------------------------------------------------------
-    // LOT B4 — CET Building (Schematic Pending; empty until backend supplies)
+    // LOT B4 — CEAFA 2 (Camera-sensed; Schematic Pending until backend supplies)
     // -------------------------------------------------------------------------
 
     // -------------------------------------------------------------------------

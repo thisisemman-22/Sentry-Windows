@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/demo_controls_sheet.dart';
 import '../../../app/providers.dart';
@@ -20,8 +21,25 @@ import '../../../shared/models/attempt_models.dart';
 /// - Bottom: 3 clean verification cards (Vehicle credential, Face match with
 ///   calibrated cosine similarity, and Driver & bay). Raw UUIDs, model
 ///   versions, and event metadata open in a right-hand details sheet on demand.
-class LiveGateMonitoringScreen extends ConsumerWidget {
+class LiveGateMonitoringScreen extends ConsumerStatefulWidget {
   const LiveGateMonitoringScreen({super.key});
+
+  @override
+  ConsumerState<LiveGateMonitoringScreen> createState() =>
+      _LiveGateMonitoringScreenState();
+}
+
+class _LiveGateMonitoringScreenState
+    extends ConsumerState<LiveGateMonitoringScreen> {
+  final TextEditingController _guestDigitsCtrl = TextEditingController();
+  bool _verifyingGuestPass = false;
+  String? _guestVerifyError;
+
+  @override
+  void dispose() {
+    _guestDigitsCtrl.dispose();
+    super.dispose();
+  }
 
   static const List<_LaneSpec> _lanes = [
     _LaneSpec(
@@ -51,13 +69,16 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     final sysState = ref.watch(sentryScenarioProvider);
     final selectedLaneId = ref.watch(focusedLaneProvider);
     final attempt = sysState.activeLaneAttempts[selectedLaneId];
     final participant = SentryFixtures.findParticipantByCode(attempt?.userCode);
     final config = ref.watch(appConfigProvider);
+    final ops = ref.watch(desktopOpsControllerProvider);
+    final actor = ref.watch(authControllerProvider).profile ??
+        SentryFixtures.guardOperator;
 
     return ScreenScaffold(
       children: [
@@ -204,6 +225,120 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
           ),
         ),
 
+        const SizedBox(height: 18),
+
+        // Compact 4-digit BSUAL- Guest Gate Pass Verification Card (Guard + Admin at gate)
+        SentryCard(
+          key: const Key('guest_gate_verify_card'),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SectionHeader(
+                title: 'Guest Pass Gate Verification (BSUAL-)',
+                subtitle:
+                    'Ask the campus guest for the 4 digits shown in their mobile app after BSUAL- to verify and link entry.',
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    key: const Key('guest_pass_prefix_badge'),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: p.subtle,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: p.line),
+                    ),
+                    child: Text(
+                      'BSUAL-',
+                      style: SentryTheme.mono(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: p.crimson,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      key: const Key('guest_pass_4digit_field'),
+                      controller: _guestDigitsCtrl,
+                      maxLength: 4,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: '4 digits',
+                        hintText: '4829',
+                        counterText: '',
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    key: const Key('guest_pass_verify_button'),
+                    onPressed: _verifyingGuestPass
+                        ? null
+                        : () async {
+                            setState(() {
+                              _verifyingGuestPass = true;
+                              _guestVerifyError = null;
+                            });
+                            final res = await ref
+                                .read(desktopOpsControllerProvider.notifier)
+                                .verifyGuestGatePass(
+                                  digits4: _guestDigitsCtrl.text,
+                                  laneId: selectedLaneId,
+                                  actor: actor,
+                                );
+                            if (!mounted) return;
+                            setState(() {
+                              _verifyingGuestPass = false;
+                              if (!res.ok) {
+                                _guestVerifyError = res.error?.message ??
+                                    'Verification failed.';
+                              }
+                            });
+                          },
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                    label: Text(_verifyingGuestPass
+                        ? 'Verifying…'
+                        : 'Verify Guest Pass'),
+                  ),
+                ],
+              ),
+              if (_guestVerifyError != null) ...[
+                const SizedBox(height: 10),
+                Callout(
+                  key: const Key('guest_pass_verify_error'),
+                  tone: PillTone.err,
+                  icon: Icons.error_outline_rounded,
+                  title: 'Invalid code',
+                  message: _guestVerifyError!,
+                ),
+              ] else if (ops.lastGuestVerification != null) ...[
+                const SizedBox(height: 10),
+                Callout(
+                  key: const Key('guest_pass_verify_result'),
+                  tone: ops.lastGuestVerification!.verified
+                      ? PillTone.ok
+                      : PillTone.err,
+                  icon: ops.lastGuestVerification!.verified
+                      ? Icons.verified_outlined
+                      : Icons.block_rounded,
+                  title:
+                      '${ops.lastGuestVerification!.passCode} · ${ops.lastGuestVerification!.guestFullName ?? 'Guest'}',
+                  message:
+                      '${ops.lastGuestVerification!.message} Plate: ${ops.lastGuestVerification!.plateNumber ?? '—'} · Host: ${ops.lastGuestVerification!.hostName ?? '—'}',
+                ),
+              ],
+            ],
+          ),
+        ),
+
         const SizedBox(height: 22),
 
         // 2. Active Lane Content with Smooth Transition
@@ -247,8 +382,9 @@ class LiveGateMonitoringScreen extends ConsumerWidget {
                             .cancelAttemptBeforePassageAsync(attempt.laneId);
                       },
                       onOpenReview: () {
+                        ref.read(monitoringSubTabProvider.notifier).state = 1;
                         ref.read(selectedDesktopTabProvider.notifier).state =
-                            DesktopNavTab.guardReviews;
+                            DesktopNavTab.monitoring;
                       },
                     ),
 

@@ -34,8 +34,8 @@ void main() {
     // 2. Verify Overview Command Dashboard renders with concise Confirmed inside KPI label
     expect(find.text('Confirmed inside'), findsOneWidget);
 
-    // 3. Navigate to View 3: Live Gate Monitoring
-    await tester.tap(find.byKey(const Key('nav_tab_liveGateMonitoring')));
+    // 3. Navigate to Monitoring -> Live Gates (default subtab 0)
+    await tester.tap(find.byKey(const Key('nav_tab_monitoring')));
     await tester.pump();
 
     // Verify face_similarity_score is displayed strictly as cosine similarity, never as %
@@ -51,9 +51,10 @@ void main() {
       findsOneWidget,
     );
 
-    // 4. Navigate to View 6: Access Logs & Lookup and verify U007's V007 and V008 are separate cards
-    await tester.tap(find.byKey(const Key('nav_tab_accessLogs')));
+    // 4. Switch to Entries & Exits (Access Logs, subtab 2) and verify U007's V007 and V008 are separate cards
+    await tester.tap(find.byKey(const Key('monitoring_subtab_2')));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
 
     await tester.tap(find.byKey(const Key('access_logs_subtab_2')));
     await tester.pump();

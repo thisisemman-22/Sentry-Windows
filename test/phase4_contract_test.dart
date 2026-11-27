@@ -1075,7 +1075,12 @@ void main() {
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await pumpFrameSettle(tester);
 
-      expect(find.byKey(const Key('nav_tab_administration')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_users')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_vehiclesRfid')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_guests')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_announcements')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_audit')), findsNothing);
+      expect(find.byKey(const Key('nav_tab_settings')), findsNothing);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(DesktopViewRouter)),
       );
@@ -1115,7 +1120,9 @@ void main() {
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await pumpFrameSettle(tester);
 
-      await tester.tap(find.byKey(const Key('nav_tab_administration')));
+      await tester.tap(find.byKey(const Key('nav_tab_users')));
+      await pumpFrameSettle(tester);
+      await tester.tap(find.byKey(const Key('users_subtab_3')));
       await pumpFrameSettle(tester);
 
       await tester.enterText(

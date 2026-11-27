@@ -95,20 +95,23 @@ void main() {
       await tapKey(tester, 'login_submit_button');
 
       for (final tab in const [
-        'overview',
-        'liveGateMonitoring',
-        'guardReviews',
-        'parkingManagement',
-        'accessLogs',
-        'deviceMonitoring',
-        'administration',
+        'dashboard',
+        'users',
+        'vehiclesRfid',
+        'parking',
+        'guests',
+        'monitoring',
+        'reports',
+        'announcements',
+        'audit',
+        'settings',
       ]) {
         await tapKey(tester, 'nav_tab_$tab');
       }
 
-      // Parking lot tabs B1–B5 + Building routing + Bay Inspector Drawer
-      await tapKey(tester, 'nav_tab_parkingManagement');
-      for (final lot in const ['B1', 'B2', 'B3', 'B4', 'B5', 'MATRIX']) {
+      // Parking lot tabs B1–B5 + Building routing + Parking Rules + Bay Inspector Drawer
+      await tapKey(tester, 'nav_tab_parking');
+      for (final lot in const ['B1', 'B2', 'B3', 'B4', 'B5', 'MATRIX', 'RULES']) {
         await tapKey(tester, 'parking_tab_$lot');
       }
       await tapKey(tester, 'parking_tab_B1');
@@ -118,21 +121,34 @@ void main() {
       await settle(tester);
 
       // Overview Export Report dialog (CSV / PDF)
-      await tapKey(tester, 'nav_tab_overview');
+      await tapKey(tester, 'nav_tab_dashboard');
       await tapKey(tester, 'overview_export_report_button');
       await tapKey(tester, 'export_menu_csv');
       expect(find.byKey(const Key('export_confirm_button')), findsOneWidget);
       await tapKey(tester, 'export_cancel_button');
 
-      // Administration sub-tabs: Account registration, Activation help,
-      // Facial enrollment (Planned), Drivers & vehicles (Planned), Audit log (Planned).
-      await tapKey(tester, 'nav_tab_administration');
-      for (var i = 0; i < 5; i++) {
-        await tapKey(tester, 'admin_subtab_$i');
+      // Users sub-tabs: Directory, Register User, Face Enrollment, OTP & Activation.
+      await tapKey(tester, 'nav_tab_users');
+      for (var i = 0; i < 4; i++) {
+        await tapKey(tester, 'users_subtab_$i');
       }
 
-      // Access Logs sub-tabs + Export Report dialog.
-      await tapKey(tester, 'nav_tab_accessLogs');
+      // Vehicles & RFID sub-tabs + Guests sub-tabs.
+      await tapKey(tester, 'nav_tab_vehiclesRfid');
+      for (var i = 0; i < 3; i++) {
+        await tapKey(tester, 'vehicles_rfid_subtab_$i');
+      }
+      await tapKey(tester, 'nav_tab_guests');
+      for (var i = 0; i < 3; i++) {
+        await tapKey(tester, 'guests_subtab_$i');
+      }
+
+      // Monitoring sub-tabs + Access Logs sub-tabs + Export Report dialog.
+      await tapKey(tester, 'nav_tab_monitoring');
+      for (var i = 0; i < 5; i++) {
+        await tapKey(tester, 'monitoring_subtab_$i');
+      }
+      await tapKey(tester, 'monitoring_subtab_2');
       for (var i = 0; i < 3; i++) {
         await tapKey(tester, 'access_logs_subtab_$i');
       }
@@ -141,8 +157,8 @@ void main() {
       expect(find.byKey(const Key('export_confirm_button')), findsOneWidget);
       await tapKey(tester, 'export_cancel_button');
 
-      // Confirm-passage modal on Live Gate.
-      await tapKey(tester, 'nav_tab_liveGateMonitoring');
+      // Confirm-passage modal on Monitoring -> Live Gates.
+      await tapKey(tester, 'monitoring_subtab_0');
       await tapKey(tester, 'confirm_vehicle_crossed_button');
       expect(
         find.byKey(const Key('passage_attestation_notes_field')),
@@ -204,13 +220,16 @@ void main() {
     expect(tester.takeException(), isNull, reason: 'Open drawer at 600x800');
 
     for (final tab in const [
-      'overview',
-      'liveGateMonitoring',
-      'guardReviews',
-      'parkingManagement',
-      'accessLogs',
-      'deviceMonitoring',
-      'administration',
+      'dashboard',
+      'users',
+      'vehiclesRfid',
+      'parking',
+      'guests',
+      'monitoring',
+      'reports',
+      'announcements',
+      'audit',
+      'settings',
     ]) {
       final drawerFinder = find.byType(Drawer);
       if (drawerFinder.evaluate().isEmpty) {

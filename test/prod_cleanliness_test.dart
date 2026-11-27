@@ -102,14 +102,14 @@ void main() {
       // Top bar in mock mode displays DEV indicator
       expect(find.text('DEV'), findsOneWidget);
 
-      // Sign out via desktop shell sign-out action
-      await tester.tap(find.byKey(const Key('nav_tab_administration')));
+      // Sign out via top/sidebar operator chip menu -> Sign out action
+      await tester.tap(find.byKey(const Key('operator_account_menu_button')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 250));
 
-      await tester.tap(find.byKey(const Key('admin_logout_button')));
+      await tester.tap(find.byKey(const Key('menu_sign_out')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 250));
 
       // After sign-out, session is cleared, dev mode reverts to false, and real mode is active
       expect(capturedRef.read(devModeUnlockedProvider), isFalse);
@@ -181,8 +181,8 @@ void main() {
       expect(find.text('Awaiting parking lot telemetry'), findsOneWidget);
       expect(find.text('No recent gate activity'), findsOneWidget);
 
-      // --- TAB 2: LIVE GATE MONITORING AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_liveGateMonitoring')));
+      // --- TAB 2: MONITORING -> LIVE GATES, REVIEWS, ACCESS LOGS, DEVICES AUDIT ---
+      await tester.tap(find.byKey(const Key('nav_tab_monitoring')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Live gates'), findsOneWidget);
@@ -196,10 +196,10 @@ void main() {
         findsOneWidget,
       );
 
-      // --- TAB 3: GUARD REVIEWS AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_guardReviews')));
+      // Subtab 1: Review Cases
+      await tester.tap(find.byKey(const Key('monitoring_subtab_1')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.text('Guard reviews'), findsOneWidget);
       // Starts with empty queue
       expect(find.text('No pending guard reviews'), findsOneWidget);
@@ -207,8 +207,33 @@ void main() {
       expect(find.byKey(const Key('simulate_stale_version_button')), findsNothing);
       expect(find.text('Test version conflict'), findsNothing);
 
-      // --- TAB 4: PARKING MANAGEMENT AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_parkingManagement')));
+      // Subtab 2: Entries & Exits (Access Logs)
+      await tester.tap(find.byKey(const Key('monitoring_subtab_2')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('Access logs'), findsOneWidget);
+      expect(find.text('No campus visits recorded'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('access_logs_subtab_1')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('No gate attempts recorded'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('access_logs_subtab_2')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('No registered drivers loaded'), findsOneWidget);
+
+      // Subtab 3: Cameras & Devices
+      await tester.tap(find.byKey(const Key('monitoring_subtab_3')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('Site devices'), findsOneWidget);
+      expect(find.text('No site devices loaded'), findsOneWidget);
+      expect(find.text('Online'), findsNothing);
+      expect(find.text('Degraded'), findsNothing);
+      expect(find.text('Offline'), findsNothing);
+
+      // --- TAB 3: PARKING MANAGEMENT AUDIT ---
+      await tester.tap(find.byKey(const Key('nav_tab_parking')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Parking map'), findsOneWidget);
@@ -226,60 +251,30 @@ void main() {
         );
       }
 
-      // --- TAB 5: ACCESS LOGS AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_accessLogs')));
+      // --- TAB 4: USERS & FACIAL ENROLLMENT AUDIT ---
+      await tester.tap(find.byKey(const Key('nav_tab_users')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('Access logs'), findsOneWidget);
-      // Subtab 0: Campus visits empty state
-      expect(find.text('No campus visits recorded'), findsOneWidget);
-      // Subtab 1: Gate attempts empty state
-      await tester.tap(find.byKey(const Key('access_logs_subtab_1')));
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('Users'), findsAtLeastNWidgets(1));
+      // Subtab 3: OTP & Activation -> NO test session expiry button
+      await tester.tap(find.byKey(const Key('users_subtab_3')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('No gate attempts recorded'), findsOneWidget);
-      // Subtab 2: Drivers & vehicles empty state
-      await tester.tap(find.byKey(const Key('access_logs_subtab_2')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('No registered drivers loaded'), findsOneWidget);
-
-      // --- TAB 6: DEVICE MONITORING AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_deviceMonitoring')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('Site devices'), findsOneWidget);
-      expect(find.text('No site devices loaded'), findsOneWidget);
-      expect(find.text('Online'), findsNothing);
-      expect(find.text('Degraded'), findsNothing);
-      expect(find.text('Offline'), findsNothing);
-
-      // --- TAB 7: ADMINISTRATION AUDIT ---
-      await tester.tap(find.byKey(const Key('nav_tab_administration')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('Administration'), findsAtLeastNWidgets(1));
-      // Subtab 3: Drivers & vehicles (Planned) empty state
-      await tester.tap(find.byKey(const Key('admin_subtab_3')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('No registered participants loaded'), findsOneWidget);
-      // NO test session expiry button
+      await tester.pump(const Duration(milliseconds: 250));
       expect(
         find.byKey(const Key('simulate_ws_1008_expiry_button')),
         findsNothing,
       );
-      // Subtab 2: Facial enrollment (Planned)
-      await tester.tap(find.byKey(const Key('admin_subtab_2')));
+      // Subtab 2: Facial enrollment
+      await tester.tap(find.byKey(const Key('users_subtab_2')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.text('No registered users available'), findsOneWidget);
       expect(find.text('Biometric Enrollment: U001'), findsNothing);
       expect(find.text('Biometric Enrollment: U002'), findsNothing);
     });
 
     testWidgets(
-        '4. Guard role isolation: hides Administration tab and blocks direct router navigation in real mode',
+        '4. Guard role isolation: hides Admin-only tabs and blocks direct router navigation in real mode',
         (tester) async {
       tester.view.physicalSize = const Size(1920, 1080);
       tester.view.devicePixelRatio = 1.0;
@@ -323,16 +318,25 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      // Guard must NEVER see the Administration nav tab in the sidebar
-      expect(find.byKey(const Key('nav_tab_administration')), findsNothing);
+      // Guard must NEVER see any of the 6 Admin-only tabs in the sidebar
+      for (final adminTabKey in const [
+        'nav_tab_users',
+        'nav_tab_vehiclesRfid',
+        'nav_tab_guests',
+        'nav_tab_announcements',
+        'nav_tab_audit',
+        'nav_tab_settings',
+      ]) {
+        expect(find.byKey(Key(adminTabKey)), findsNothing);
+      }
 
       // Even if tab state is mutated programmatically, RoleGate keeps Guard off
-      // AdministrationScreen and never instantiates Admin-only providers.
+      // Admin screens and never instantiates Admin-only providers.
       final container = ProviderScope.containerOf(
         tester.element(find.byType(DesktopViewRouter)),
       );
       container.read(selectedDesktopTabProvider.notifier).state =
-          DesktopNavTab.administration;
+          DesktopNavTab.users;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
