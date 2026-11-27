@@ -72,6 +72,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
         if (ops.announcements.isEmpty)
           const SentryCard(
             child: EmptyState(
+              showBrandLogo: true,
               icon: Icons.campaign_outlined,
               title: 'No announcements posted',
               message: 'Click New Announcement to notify campus drivers.',
@@ -80,6 +81,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
         else
           for (final ann in ops.announcements) ...[
             SentryCard(
+              accent: ann.pinned ? SentryColors.crimson : null,
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,25 +109,23 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                           for (final role in ann.audienceRoles)
                             StatusPill(
                               label: role,
-                              tone: PillTone.info,
-                              monospace: true,
+                              tone: PillTone.neutral,
                             ),
                         ],
                       ),
                       Wrap(
                         spacing: 8,
                         children: [
-                          OutlinedButton.icon(
+                          OutlinedButton(
                             key: Key('announcement_edit_${ann.announcementId}'),
                             onPressed: () => _openEditorDialog(
                               context,
                               actor: profile,
                               existing: ann,
                             ),
-                            icon: const Icon(Icons.edit_outlined, size: 16),
-                            label: const Text('Edit'),
+                            child: const Text('Edit'),
                           ),
-                          OutlinedButton.icon(
+                          OutlinedButton(
                             key: Key(
                                 'announcement_delete_${ann.announcementId}'),
                             style: OutlinedButton.styleFrom(
@@ -143,8 +143,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                                 _banner = 'Deleted "${ann.title}".';
                               });
                             },
-                            icon: const Icon(Icons.delete_outline, size: 16),
-                            label: const Text('Delete'),
+                            child: const Text('Delete'),
                           ),
                         ],
                       ),
@@ -154,7 +153,7 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
                   Text(ann.body, style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 8),
                   Text(
-                    'Posted by ${ann.authorUserCode} · ${ManilaTime.formatDateTime(ann.publishedAtUtc)}',
+                    'By ${ann.authorUserCode} · ${ManilaTime.formatDateTime(ann.publishedAtUtc)}',
                     style: SentryTheme.mono(fontSize: 12, color: p.muted),
                   ),
                 ],

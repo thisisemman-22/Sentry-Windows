@@ -100,8 +100,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SectionHeader(
-                title: '1. Choose preset & filters',
-                subtitle: 'Identifiers are automatically masked in report previews.',
+                title: 'Report preset & filters',
+                subtitle: 'Identifiers are automatically masked in previews.',
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -180,7 +180,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SectionHeader(
-                title: '2. Masked preview — ${_preset.label}',
+                title: 'Preview — ${_preset.label}',
                 subtitle:
                     '${previewRows.length > 1 ? previewRows.length - 1 : 0} row(s) matching filters.',
               ),
@@ -235,26 +235,62 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SectionHeader(
-                title: '3. Export history',
+                title: 'Export history',
                 subtitle: 'CSV and PDF exports generated in this session.',
               ),
               const SizedBox(height: 12),
               if (ops.exportHistory.isEmpty)
                 const EmptyState(
+                  showBrandLogo: true,
                   icon: Icons.history_toggle_off_outlined,
                   title: 'No exports yet',
                   message:
-                      'Click Export CSV or Export PDF above to download and record a report.',
+                      'Use Export CSV or Export PDF above to download a report.',
                 )
               else
                 for (var i = 0; i < ops.exportHistory.length; i++) ...[
-                  if (i > 0) Divider(color: p.line, height: 18),
-                  KeyValueRow(
-                    label:
+                  if (i > 0) Divider(color: p.line, height: 1),
+                  SentryRowTile(
+                    title:
                         '${ops.exportHistory[i].presetLabel} (${ops.exportHistory[i].format})',
-                    value:
-                        '${ops.exportHistory[i].filterSummary} · by ${ops.exportHistory[i].exportedByUserCode} · ${ManilaTime.formatDateTime(ops.exportHistory[i].exportedAtUtc)}',
-                    mono: true,
+                    subtitle:
+                        'Exported by ${ops.exportHistory[i].exportedByUserCode} · ${ManilaTime.formatDateTime(ops.exportHistory[i].exportedAtUtc)}',
+                    badges: [
+                      StatusPill(
+                        label: ops.exportHistory[i].format,
+                        tone: PillTone.info,
+                        monospace: true,
+                      ),
+                    ],
+                    onTap: () => showDetailsSheet<void>(
+                      context,
+                      frosted: true,
+                      title:
+                          '${ops.exportHistory[i].presetLabel} (${ops.exportHistory[i].format})',
+                      subtitle:
+                          'Exported by ${ops.exportHistory[i].exportedByUserCode}',
+                      builder: (ctx) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          KeyValueRow(
+                            label: 'Export ID',
+                            value: ops.exportHistory[i].exportId,
+                            mono: true,
+                          ),
+                          KeyValueRow(
+                            label: 'Filters applied',
+                            value: ops.exportHistory[i].filterSummary,
+                            mono: true,
+                          ),
+                          KeyValueRow(
+                            label: 'Generated at',
+                            value: ManilaTime.formatDateTime(
+                                ops.exportHistory[i].exportedAtUtc),
+                            mono: true,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
             ],

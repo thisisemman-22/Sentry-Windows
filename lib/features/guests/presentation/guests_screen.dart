@@ -4,7 +4,6 @@ import '../../../app/providers.dart';
 import '../../../core/motion/motion.dart';
 import '../../../core/network/api_envelope.dart';
 import '../../../core/theme/sentry_colors.dart';
-import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/plate_badge.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/models/auth_models.dart';
@@ -56,8 +55,11 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
         PageIntro(
           title: 'Guests',
           subtitle:
-              'Review visitor requests, manage guest portal accounts, and monitor overdue guest vehicles.',
+              'Review visitor requests, manage guest portal accounts, and monitor overdue vehicles.',
           actions: [
+            const InfoHint(
+              'Approved guests generate their 4-digit BSUAL- pass code inside their mobile app. Administrators never view pass codes; Security Guards verify the 4 digits at the gate.',
+            ),
             SegmentTabs(
               keyPrefix: 'guests_subtab',
               labels: const [
@@ -77,14 +79,6 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
               }),
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        const Callout(
-          tone: PillTone.info,
-          icon: Icons.verified_user_outlined,
-          title: 'Guest Pass Code Privacy',
-          message:
-              'Approved guests generate their 4-digit BSUAL- pass code inside their mobile app. Administrators never view pass codes; Security Guards verify the 4 digits at the gate.',
         ),
         if (_feedback != null) ...[
           const SizedBox(height: 14),
@@ -195,101 +189,91 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
       _ => PillTone.neutral,
     };
 
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 12,
-      runSpacing: 10,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    req.guestFullName,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  PlateBadge(plateText: req.plateNumber),
-                  StatusPill(
-                    label: req.status,
-                    tone: tone,
-                    monospace: true,
-                  ),
-                  if (req.isOverdue())
-                    const StatusPill(
-                      label: 'Overdue inside campus',
-                      tone: PillTone.err,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Host: ${req.hostName} (${req.hostDepartment}) · Purpose: ${req.purpose}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Window (Asia/Manila): ${ManilaTime.formatDateTime(req.windowStartUtc)} -> ${ManilaTime.formatTimeOnly(req.windowEndUtc)}',
-                style: SentryTheme.mono(fontSize: 12, color: p.muted),
-              ),
-              if (req.rejectionReason != null &&
-                  req.rejectionReason!.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Rejection reason: ${req.rejectionReason}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: p.errText),
-                ),
-              ],
-            ],
-          ),
+    final timeWindow =
+        '${ManilaTime.formatDateTime(req.windowStartUtc)} – ${ManilaTime.formatTimeOnly(req.windowEndUtc)}';
+    final sub = req.rejectionReason != null &&
+            req.rejectionReason!.trim().isNotEmpty
+        ? 'Host: ${req.hostName} · Reason: ${req.rejectionReason}'
+        : 'Host: ${req.hostName} · $timeWindow';
+
+    return SentryRowTile(
+      leading: PlateBadge(plateText: req.plateNumber, isCompact: true),
+      title: req.guestFullName,
+      subtitle: sub,
+      badges: [
+        StatusPill(
+          label: req.status,
+          tone: tone,
         ),
-        if (req.status == 'pending')
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              FilledButton.icon(
-                key: Key('approve_guest_req_${req.visitRequestId}'),
-                onPressed: () async {
-                  final res = await ref
-                      .read(desktopOpsControllerProvider.notifier)
-                      .reviewGuestVisitRequest(
-                        visitRequestId: req.visitRequestId,
-                        approve: true,
-                        actor: actor,
-                      );
-                  if (!mounted) return;
-                  setState(() {
-                    _feedbackIsError = !res.ok;
-                    _feedback = res.ok
-                        ? 'Approved visit for ${req.guestFullName}. Pass code remains private to guest mobile app.'
-                        : (res.error?.message ?? 'Approval failed.');
-                  });
-                },
-                icon: const Icon(Icons.check_rounded, size: 17),
-                label: const Text('Approve'),
-              ),
-              OutlinedButton.icon(
-                key: Key('reject_guest_req_${req.visitRequestId}'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: SentryColors.crimson,
-                ),
-                onPressed: () => _openRejectDialog(context, req, actor),
-                icon: const Icon(Icons.close_rounded, size: 17),
-                label: const Text('Reject'),
-              ),
-            ],
+        if (req.isOverdue())
+          const StatusPill(
+            label: 'Overdue inside campus',
+            tone: PillTone.err,
           ),
       ],
+      actions: [
+        if (req.status == 'pending') ...[
+          FilledButton(
+            key: Key('approve_guest_req_${req.visitRequestId}'),
+            onPressed: () async {
+              final res = await ref
+                  .read(desktopOpsControllerProvider.notifier)
+                  .reviewGuestVisitRequest(
+                    visitRequestId: req.visitRequestId,
+                    approve: true,
+                    actor: actor,
+                  );
+              if (!mounted) return;
+              setState(() {
+                _feedbackIsError = !res.ok;
+                _feedback = res.ok
+                    ? 'Approved visit for ${req.guestFullName}. Pass code remains private to guest mobile app.'
+                    : (res.error?.message ?? 'Approval failed.');
+              });
+            },
+            child: const Text('Approve'),
+          ),
+          OutlinedButton(
+            key: Key('reject_guest_req_${req.visitRequestId}'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: SentryColors.crimson,
+            ),
+            onPressed: () => _openRejectDialog(context, req, actor),
+            child: const Text('Reject'),
+          ),
+        ],
+      ],
+      onTap: () => showDetailsSheet<void>(
+        context,
+        frosted: true,
+        title: req.guestFullName,
+        subtitle: '${req.plateNumber} · ${req.status}',
+        builder: (ctx) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            KeyValueRow(label: 'Email', value: req.guestEmail),
+            KeyValueRow(
+                label: 'Host',
+                value: '${req.hostName} (${req.hostDepartment})'),
+            KeyValueRow(label: 'Purpose', value: req.purpose),
+            KeyValueRow(label: 'Window', value: timeWindow, mono: true),
+            KeyValueRow(
+              label: 'Inside campus',
+              value: req.isCurrentlyInside ? 'Yes' : 'No',
+            ),
+            if (req.rejectionReason != null)
+              KeyValueRow(
+                  label: 'Rejection reason', value: req.rejectionReason!),
+            const Divider(height: 22),
+            KeyValueRow(
+                label: 'Request ID', value: req.visitRequestId, mono: true),
+            KeyValueRow(
+                label: 'Guest Account ID',
+                value: req.guestAccountId,
+                mono: true),
+          ],
+        ),
+      ),
     );
   }
 
@@ -394,101 +378,68 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
             )
           else
             for (var i = 0; i < accounts.length; i++) ...[
-              if (i > 0) Divider(color: p.line, height: 22),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            accounts[i].fullName,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          StatusPill(
-                            label: accounts[i].status,
-                            tone: accounts[i].status == 'active'
-                                ? PillTone.ok
-                                : accounts[i].status == 'suspended'
-                                    ? PillTone.err
-                                    : PillTone.warn,
-                            monospace: true,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${accounts[i].email} · ${accounts[i].phone}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+              if (i > 0) Divider(color: p.line, height: 1),
+              SentryRowTile(
+                leading: MonogramAvatar(name: accounts[i].fullName),
+                title: accounts[i].fullName,
+                subtitle: '${accounts[i].email} · ${accounts[i].phone}',
+                badges: [
+                  StatusPill(
+                    label: accounts[i].status,
+                    tone: accounts[i].status == 'active'
+                        ? PillTone.ok
+                        : accounts[i].status == 'suspended'
+                            ? PillTone.err
+                            : PillTone.warn,
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      OutlinedButton.icon(
-                        key: Key('reset_guest_pwd_${accounts[i].guestAccountId}'),
-                        onPressed: () {
-                          ref
-                              .read(desktopOpsControllerProvider.notifier)
-                              .resetGuestAccountPassword(
-                                guestAccountId: accounts[i].guestAccountId,
-                                actor: actor,
-                              );
-                          setState(() {
-                            _feedbackIsError = false;
-                            _feedback =
-                                'Reset ${accounts[i].fullName} to the General Password (first-login change required).';
-                          });
-                        },
-                        icon: const Icon(Icons.lock_reset_rounded, size: 17),
-                        label: const Text('Reset Password'),
-                      ),
-                      OutlinedButton.icon(
-                        key: Key(
-                            'toggle_guest_suspend_${accounts[i].guestAccountId}'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: accounts[i].status == 'suspended'
-                              ? p.okText
-                              : SentryColors.crimson,
-                        ),
-                        onPressed: () {
-                          final suspend = accounts[i].status != 'suspended';
-                          ref
-                              .read(desktopOpsControllerProvider.notifier)
-                              .toggleGuestAccountSuspend(
-                                guestAccountId: accounts[i].guestAccountId,
-                                suspend: suspend,
-                                actor: actor,
-                              );
-                          setState(() {
-                            _feedbackIsError = false;
-                            _feedback = suspend
-                                ? 'Suspended guest account ${accounts[i].fullName}.'
-                                : 'Reactivated guest account ${accounts[i].fullName}.';
-                          });
-                        },
-                        icon: Icon(
-                          accounts[i].status == 'suspended'
-                              ? Icons.play_circle_outline_rounded
-                              : Icons.block_rounded,
-                          size: 17,
-                        ),
-                        label: Text(
-                          accounts[i].status == 'suspended'
-                              ? 'Reactivate'
-                              : 'Suspend',
-                        ),
-                      ),
-                    ],
+                ],
+                actions: [
+                  OutlinedButton(
+                    key: Key('reset_guest_pwd_${accounts[i].guestAccountId}'),
+                    onPressed: () {
+                      ref
+                          .read(desktopOpsControllerProvider.notifier)
+                          .resetGuestAccountPassword(
+                            guestAccountId: accounts[i].guestAccountId,
+                            actor: actor,
+                          );
+                      setState(() {
+                        _feedbackIsError = false;
+                        _feedback =
+                            'Reset ${accounts[i].fullName} to the General Password (first-login change required).';
+                      });
+                    },
+                    child: const Text('Reset Password'),
+                  ),
+                  OutlinedButton(
+                    key: Key(
+                        'toggle_guest_suspend_${accounts[i].guestAccountId}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: accounts[i].status == 'suspended'
+                          ? p.okText
+                          : SentryColors.crimson,
+                    ),
+                    onPressed: () {
+                      final suspend = accounts[i].status != 'suspended';
+                      ref
+                          .read(desktopOpsControllerProvider.notifier)
+                          .toggleGuestAccountSuspend(
+                            guestAccountId: accounts[i].guestAccountId,
+                            suspend: suspend,
+                            actor: actor,
+                          );
+                      setState(() {
+                        _feedbackIsError = false;
+                        _feedback = suspend
+                            ? 'Suspended guest account ${accounts[i].fullName}.'
+                            : 'Reactivated guest account ${accounts[i].fullName}.';
+                      });
+                    },
+                    child: Text(
+                      accounts[i].status == 'suspended'
+                          ? 'Reactivate'
+                          : 'Suspend',
+                    ),
                   ),
                 ],
               ),

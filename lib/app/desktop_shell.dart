@@ -764,21 +764,15 @@ class _NavItemState extends State<_NavItem> {
               duration: SentryMotion.of(
                   context, const Duration(milliseconds: 180)),
               curve: Curves.easeOutCubic,
-              height: 46,
+              height: 42,
               padding: EdgeInsets.symmetric(
-                  horizontal: widget.collapsed ? 0 : 14),
+                  horizontal: widget.collapsed ? 0 : 12),
               decoration: BoxDecoration(
                 color: sel
                     ? SentryColors.crimson
-                        .withValues(alpha: p.isDark ? 0.22 : 0.14)
+                        .withValues(alpha: p.isDark ? 0.18 : 0.10)
                     : (_hover ? p.subtle : Colors.transparent),
-                borderRadius: BorderRadius.circular(14),
-                border: sel
-                    ? Border.all(
-                        color: SentryColors.crimson
-                            .withValues(alpha: p.isDark ? 0.42 : 0.30),
-                      )
-                    : null,
+                borderRadius: BorderRadius.circular(11),
               ),
               child: widget.collapsed
                   ? Stack(
@@ -786,15 +780,15 @@ class _NavItemState extends State<_NavItem> {
                       children: [
                         Icon(
                             sel ? widget.tab.selectedIcon : widget.tab.icon,
-                            size: 22,
+                            size: 21,
                             color: iconColor),
                         if (widget.badge > 0)
                           Positioned(
-                            top: 8,
+                            top: 7,
                             right: 12,
                             child: Container(
-                              width: 9,
-                              height: 9,
+                              width: 8,
+                              height: 8,
                               decoration: BoxDecoration(
                                 color: sel ? SentryColors.crimson : t.solid,
                                 shape: BoxShape.circle,
@@ -806,11 +800,22 @@ class _NavItemState extends State<_NavItem> {
                     )
                   : Row(
                       children: [
+                        AnimatedContainer(
+                          duration: SentryMotion.of(
+                              context, const Duration(milliseconds: 180)),
+                          width: 3,
+                          height: sel ? 18 : 0,
+                          decoration: BoxDecoration(
+                            color: activeCrimson,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                        SizedBox(width: sel ? 9 : 12),
                         Icon(
                             sel ? widget.tab.selectedIcon : widget.tab.icon,
-                            size: 21,
+                            size: 19,
                             color: iconColor),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 11),
                         Expanded(
                           child: Text(
                             widget.tab.title,
@@ -1073,10 +1078,11 @@ class _TopBar extends ConsumerWidget {
     final ws = ref.watch(sentryScenarioProvider.select((s) => s.wsState));
     final config = ref.watch(appConfigProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final activeTab = ref.watch(selectedDesktopTabProvider);
     final wide = MediaQuery.sizeOf(context).width >= 1180;
 
     return Container(
-      height: 56,
+      height: 54,
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
       decoration: BoxDecoration(
         color: p.bg,
@@ -1093,6 +1099,16 @@ class _TopBar extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 4),
+          ] else ...[
+            Text(
+              activeTab.title,
+              style: SentryTheme.display(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: p.text,
+              ),
+            ),
+            const SizedBox(width: 12),
           ],
           Flexible(
             child: _ConnectionStatus(
@@ -1114,9 +1130,17 @@ class _TopBar extends ConsumerWidget {
                   )
                 : OutlinedButton.icon(
                     key: const Key('open_command_palette_button'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      backgroundColor: p.subtle,
+                    ),
                     onPressed: () => showCommandPalette(context, ref),
-                    icon: const Icon(Icons.search_rounded, size: 18),
-                    label: Text(wide ? 'Search  ·  Ctrl+K' : 'Ctrl+K'),
+                    icon: const Icon(Icons.search_rounded, size: 16),
+                    label: Text(
+                      wide ? 'Search  ·  Ctrl+K' : 'Ctrl+K',
+                      style: TextStyle(fontSize: 12.5, color: p.slate),
+                    ),
                   ),
           ),
           const SizedBox(width: 8),

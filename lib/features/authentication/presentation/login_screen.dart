@@ -111,6 +111,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           backgroundColor: p.bg,
           body: Stack(
             children: [
+              // Subtle atmospheric ambient glow behind hero stage
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.75, -0.65),
+                        radius: 1.15,
+                        colors: [
+                          SentryColors.crimson
+                              .withValues(alpha: p.isDark ? 0.14 : 0.06),
+                          p.bg.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               // Subtle top-right theme toggle
               Positioned(
                 top: 24,
@@ -242,36 +260,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           const SizedBox(height: 18),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Text(
-              'Real-time gate verification, live bay availability across Lots B1 to B5, and calm decision support for campus security.',
+              'Real-time gate verification and live campus parking across BatStateU Alangilan.',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: p.slate,
-                    height: 1.6,
+                    color: p.muted,
+                    height: 1.55,
                   ),
             ),
-          ),
-          const SizedBox(height: 28),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: const [
-              StatusPill(
-                label: 'Plate + Face entry',
-                tone: PillTone.neutral,
-                icon: Icons.directions_car_outlined,
-              ),
-              StatusPill(
-                label: 'RFID + Face motorcycles',
-                tone: PillTone.neutral,
-                icon: Icons.two_wheeler_outlined,
-              ),
-              StatusPill(
-                label: 'Lots B1–B5 live bays',
-                tone: PillTone.neutral,
-                icon: Icons.local_parking_rounded,
-              ),
-            ],
           ),
         ],
       ),
@@ -480,18 +476,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: authState.isLoading
                       ? null
                       : () => showGuardActivationDialog(context),
-                  child: const Text(
-                    'First-time activation (Security Guards only)',
-                  ),
+                  child: const Text('Guard first-time activation'),
                 ),
                 TextButton(
                   key: const Key('guard_password_reset_link'),
                   onPressed: authState.isLoading
                       ? null
                       : () => showGuardPasswordResetDialog(context),
-                  child: const Text(
-                    'Forgot password? (Security Guards only)',
-                  ),
+                  child: const Text('Forgot password?'),
                 ),
               ],
             ),
@@ -536,11 +528,23 @@ class _LogoHeroState extends State<_LogoHero>
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 220,
-      height: 220,
+      width: 212,
+      height: 212,
       decoration: BoxDecoration(
         color: SentryColors.crimson,
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.16),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: SentryColors.crimson.withValues(alpha: 0.28),
+            blurRadius: 36,
+            offset: const Offset(0, 16),
+            spreadRadius: -8,
+          ),
+        ],
       ),
       child: Stack(
         alignment: Alignment.center,

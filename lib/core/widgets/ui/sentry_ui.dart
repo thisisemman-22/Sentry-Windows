@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../motion/motion.dart';
 import '../../theme/sentry_colors.dart';
 import '../../theme/sentry_theme.dart';
+import '../sentry_interactive_logo.dart';
 import '../status_pills.dart';
 
 export '../status_pills.dart' show PillTone, StatusPill;
@@ -87,23 +88,25 @@ class _SentryCardState extends State<SentryCard> {
     final p = SentryPalette.of(context);
     final interactive = widget.onTap != null;
     final lifted = interactive && (_hover || _focus);
+    final restingBorder =
+        p.isDark ? const Color(0xFF1F1F26) : p.cardBorder;
     final borderColor = widget.selected
         ? p.crimson
         : _focus
             ? p.crimson
-            : (widget.accent?.withValues(alpha: 0.55) ?? p.cardBorder);
+            : (widget.accent?.withValues(alpha: 0.55) ?? restingBorder);
 
     final card = AnimatedContainer(
       duration: SentryMotion.of(context, SentryMotion.short),
       curve: SentryMotion.emphasized,
-      transform: Matrix4.translationValues(0, lifted ? -3 : 0, 0),
+      transform: Matrix4.translationValues(0, lifted ? -1.5 : 0, 0),
       padding: widget.padding,
       decoration: BoxDecoration(
         color: widget.color ?? p.card,
         borderRadius: BorderRadius.circular(widget.radius),
         border: Border.all(
           color: borderColor,
-          width: widget.selected || _focus ? 2 : 1,
+          width: widget.selected || _focus ? 1.5 : 1,
         ),
         boxShadow: lifted ? p.shadowRaised : p.shadowSoft,
       ),
@@ -232,15 +235,21 @@ class PageIntro extends StatelessWidget {
                   header: true,
                   child: Text(
                     title,
-                    style: SentryTheme.display(fontSize: 32, color: p.text),
+                    style: SentryTheme.display(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                      color: p.text,
+                    ),
                   ),
                 ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle!,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: p.slate,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: p.muted,
+                          fontSize: 14.5,
                         ),
                   ),
                 ],
@@ -703,11 +712,11 @@ class SegmentTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: p.subtle,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.line),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: p.line, width: 1),
       ),
       child: Wrap(
         spacing: 4,
@@ -744,7 +753,9 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = SentryPalette.of(context);
-    final fg = selected ? (p.isDark ? p.bg : Colors.white) : p.slate;
+    final activeBg = p.isDark ? const Color(0xFF26262E) : Colors.white;
+    final fg = selected ? p.text : p.muted;
+    final iconColor = selected ? SentryColors.crimson : p.muted;
     return Semantics(
       selected: selected,
       button: true,
@@ -754,22 +765,22 @@ class _SegmentButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(9),
           child: AnimatedContainer(
             duration: SentryMotion.of(context, SentryMotion.short),
             curve: SentryMotion.emphasized,
-            constraints: const BoxConstraints(minHeight: 40),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            constraints: const BoxConstraints(minHeight: 36),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: selected ? p.text : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
+              color: selected ? activeBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: p.text.withValues(alpha: 0.22),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                        spreadRadius: -4,
+                        color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                        spreadRadius: -1,
                       ),
                     ]
                   : null,
@@ -778,16 +789,16 @@ class _SegmentButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 17, color: selected ? p.crimsonHover : fg),
-                  const SizedBox(width: 8),
+                  Icon(icon, size: 16, color: iconColor),
+                  const SizedBox(width: 7),
                 ],
                 Flexible(
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                       color: fg,
                     ),
                   ),
@@ -857,6 +868,7 @@ class EmptyState extends StatelessWidget {
   final String title;
   final String? message;
   final Widget? action;
+  final bool showBrandLogo;
 
   const EmptyState({
     super.key,
@@ -864,6 +876,7 @@ class EmptyState extends StatelessWidget {
     required this.title,
     this.message,
     this.action,
+    this.showBrandLogo = false,
   });
 
   @override
@@ -876,15 +889,27 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: p.subtle,
-                shape: BoxShape.circle,
+            if (showBrandLogo)
+              Container(
+                width: 68,
+                height: 68,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: SentryColors.crimson.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const SentryInteractiveLogo(size: 46),
+              )
+            else
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: p.subtle,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 26, color: p.muted),
               ),
-              child: Icon(icon, size: 28, color: p.muted),
-            ),
             const SizedBox(height: 16),
             Text(
               title,
@@ -1197,6 +1222,199 @@ class ScreenScaffold extends StatelessWidget {
   }
 }
 
+/// Clean initials avatar circle for member, guest, and guard rows.
+class MonogramAvatar extends StatelessWidget {
+  final String name;
+  final bool highlight;
+  final double size;
+
+  const MonogramAvatar({
+    super.key,
+    required this.name,
+    this.highlight = false,
+    this.size = 36,
+  });
+
+  String get _initials {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: highlight ? p.crimsonTint : p.subtle,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: highlight
+              ? SentryColors.crimson.withValues(alpha: 0.25)
+              : p.line,
+        ),
+      ),
+      child: Text(
+        _initials,
+        style: SentryTheme.display(
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w800,
+          color: highlight ? SentryColors.crimson : p.text,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+/// Calm, hover-responsive desktop list row (2-3 data points max; technical
+/// metadata opens via [onTap] in a frosted details drawer).
+class SentryRowTile extends StatefulWidget {
+  final Widget? leading;
+  final String title;
+  final String? subtitle;
+  final List<Widget> badges;
+  final List<Widget> actions;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+
+  const SentryRowTile({
+    super.key,
+    this.leading,
+    required this.title,
+    this.subtitle,
+    this.badges = const [],
+    this.actions = const [],
+    this.onTap,
+    this.padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+  });
+
+  @override
+  State<SentryRowTile> createState() => _SentryRowTileState();
+}
+
+class _SentryRowTileState extends State<SentryRowTile> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SentryPalette.of(context);
+    final trailingWidgets = <Widget>[
+      ...widget.badges,
+      ...widget.actions,
+      if (widget.onTap != null)
+        Icon(
+          Icons.chevron_right_rounded,
+          size: 18,
+          color: _hover ? p.text : p.muted,
+        ),
+    ];
+
+    final rowContent = AnimatedContainer(
+      duration: SentryMotion.of(context, SentryMotion.short),
+      curve: Curves.easeOutCubic,
+      padding: widget.padding,
+      decoration: BoxDecoration(
+        color: _hover && widget.onTap != null
+            ? p.subtle.withValues(alpha: 0.65)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow =
+              constraints.maxWidth < 600 && trailingWidgets.isNotEmpty;
+          final mainRow = Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (widget.leading != null) ...[
+                widget.leading!,
+                const SizedBox(width: 14),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: p.text,
+                          ),
+                    ),
+                    if (widget.subtitle != null &&
+                        widget.subtitle!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: p.muted,
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!isNarrow && trailingWidgets.isNotEmpty) ...[
+                const SizedBox(width: 14),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: trailingWidgets,
+                  ),
+                ),
+              ],
+            ],
+          );
+
+          if (!isNarrow) return mainRow;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              mainRow,
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: trailingWidgets,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (widget.onTap == null) return rowContent;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: rowContent,
+      ),
+    );
+  }
+}
+
 /// Calm RBAC callout panel shown whenever a restricted view is opened by
 /// a non-Administrator account (never exposes admin controls).
 class RoleRestrictedPanel extends StatelessWidget {
@@ -1214,6 +1432,7 @@ class RoleRestrictedPanel extends StatelessWidget {
     return SentryCard(
       padding: const EdgeInsets.all(24),
       child: EmptyState(
+        showBrandLogo: true,
         icon: Icons.admin_panel_settings_outlined,
         title: 'Administrator access required',
         message:

@@ -57,6 +57,7 @@ class SettingsScreen extends ConsumerWidget {
         if (settings == null)
           SentryCard(
             child: EmptyState(
+              showBrandLogo: true,
               icon: Icons.settings_ethernet_outlined,
               title: 'Backend settings unavailable',
               message:
@@ -73,86 +74,108 @@ class SettingsScreen extends ConsumerWidget {
             ),
           )
         else ...[
-          SentryCard(
-            key: const Key('settings_auth_policy_card'),
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SectionHeader(
-                  title: 'Authentication & lockout policy (Read-only)',
-                  subtitle: 'Enforced by FastAPI backend authentication service.',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final authCard = SentryCard(
+                key: const Key('settings_auth_policy_card'),
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SectionHeader(
+                      title: 'Authentication & lockout',
+                      subtitle: 'Enforced by FastAPI backend auth service.',
+                    ),
+                    const SizedBox(height: 12),
+                    KeyValueRow(
+                      label: 'Access session TTL',
+                      value: '${settings.accessSessionMinutes} minutes',
+                      mono: true,
+                    ),
+                    KeyValueRow(
+                      label: 'Refresh session TTL',
+                      value: '${settings.refreshSessionHours} hours',
+                      mono: true,
+                    ),
+                    KeyValueRow(
+                      label: 'Lockout policy',
+                      value:
+                          '${settings.maxLoginAttempts} attempts -> ${settings.lockoutMinutes} min lockout',
+                      mono: true,
+                    ),
+                    KeyValueRow(
+                      label: 'General password TTL',
+                      value: '${settings.generalPasswordExpiryHours} hours',
+                      mono: true,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                KeyValueRow(
-                  label: 'Access session TTL',
-                  value: '${settings.accessSessionMinutes} minutes',
-                  mono: true,
+              );
+              final runtimeCard = SentryCard(
+                key: const Key('settings_runtime_card'),
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SectionHeader(
+                      title: 'Contract, JWT & database',
+                      subtitle: 'Phase 4 OpenAPI server runtime inspection.',
+                      trailing: StatusPill(
+                        label: settings.databaseConnected
+                            ? 'DB Connected (${settings.databaseLatencyMs} ms)'
+                            : 'DB Disconnected',
+                        tone: settings.databaseConnected
+                            ? PillTone.ok
+                            : PillTone.err,
+                        monospace: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    KeyValueRow(
+                      label: 'Contract version',
+                      value: settings.contractVersion,
+                      mono: true,
+                    ),
+                    KeyValueRow(
+                      label: 'JWT signing key',
+                      value: settings.signingKeyStatus,
+                      mono: true,
+                    ),
+                    KeyValueRow(
+                      label: 'Allowed CORS origins',
+                      value: settings.corsOrigins.isEmpty
+                          ? 'None configured'
+                          : settings.corsOrigins.join(' · '),
+                      mono: true,
+                    ),
+                  ],
                 ),
-                KeyValueRow(
-                  label: 'Refresh session TTL',
-                  value: '${settings.refreshSessionHours} hours',
-                  mono: true,
-                ),
-                KeyValueRow(
-                  label: 'Lockout policy',
-                  value:
-                      '${settings.maxLoginAttempts} attempts -> ${settings.lockoutMinutes} min lockout',
-                  mono: true,
-                ),
-                KeyValueRow(
-                  label: 'General Password default expiry',
-                  value: '${settings.generalPasswordExpiryHours} hours',
-                  mono: true,
-                ),
-              ],
-            ),
+              );
+
+              if (constraints.maxWidth < 980) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    authCard,
+                    const SizedBox(height: 16),
+                    runtimeCard,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: authCard),
+                  const SizedBox(width: 16),
+                  Expanded(child: runtimeCard),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 16),
-          SentryCard(
-            key: const Key('settings_runtime_card'),
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SectionHeader(
-                  title: 'Contract, JWT & database status (Read-only)',
-                  subtitle: 'Phase 4 OpenAPI server runtime inspection.',
-                  trailing: StatusPill(
-                    label: settings.databaseConnected
-                        ? 'DB Connected (${settings.databaseLatencyMs} ms)'
-                        : 'DB Disconnected',
-                    tone: settings.databaseConnected
-                        ? PillTone.ok
-                        : PillTone.err,
-                    monospace: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                KeyValueRow(
-                  label: 'Contract version',
-                  value: settings.contractVersion,
-                  mono: true,
-                ),
-                KeyValueRow(
-                  label: 'JWT signing key',
-                  value: settings.signingKeyStatus,
-                  mono: true,
-                ),
-                KeyValueRow(
-                  label: 'Allowed CORS origins',
-                  value: settings.corsOrigins.isEmpty
-                      ? 'None configured'
-                      : settings.corsOrigins.join(' · '),
-                  mono: true,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Configuration is managed exclusively on the FastAPI server environment.',
-                  style: SentryTheme.mono(fontSize: 12, color: p.muted),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          Text(
+            'Read-only configuration managed on the FastAPI server environment.',
+            style: SentryTheme.mono(fontSize: 12, color: p.muted),
           ),
         ],
       ],

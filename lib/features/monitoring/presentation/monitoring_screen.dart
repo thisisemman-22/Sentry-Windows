@@ -21,7 +21,6 @@ class MonitoringScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final p = SentryPalette.of(context);
     final profile = ref.watch(authControllerProvider).profile;
     final isAdmin = profile?.role.isAdmin ?? false;
     final maxTab = isAdmin ? 4 : 3;
@@ -31,15 +30,13 @@ class MonitoringScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-          decoration: BoxDecoration(
-            color: p.card.withValues(alpha: 0.85),
-            border: Border(bottom: BorderSide(color: p.line)),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentTabs(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentTabs(
               keyPrefix: 'monitoring_subtab',
               labels: [
                 'Live Gates',
@@ -59,6 +56,7 @@ class MonitoringScreen extends ConsumerWidget {
               onChanged: (i) {
                 ref.read(monitoringSubTabProvider.notifier).state = i;
               },
+            ),
             ),
           ),
         ),
@@ -160,76 +158,43 @@ class _GuardAccountsAdminTabState
     ProfileDto guard,
     ProfileDto actor,
   ) {
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 12,
-      runSpacing: 8,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  guard.fullName,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                StatusPill(
-                  label: guard.userCode,
-                  tone: PillTone.neutral,
-                  monospace: true,
-                ),
-                StatusPill(
-                  label: guard.isActive ? 'active' : 'inactive',
-                  tone: guard.isActive ? PillTone.ok : PillTone.err,
-                  monospace: true,
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${guard.email ?? guard.username} · Station: ${guard.assignedStation}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+    return SentryRowTile(
+      leading: MonogramAvatar(name: guard.fullName),
+      title: guard.fullName,
+      subtitle: '${guard.assignedStation} · ${guard.email ?? guard.username}',
+      badges: [
+        StatusPill(
+          label: guard.userCode,
+          tone: PillTone.neutral,
+          monospace: true,
         ),
-        Wrap(
-          spacing: 8,
-          children: [
-            OutlinedButton.icon(
-              key: Key('guard_edit_${guard.userCode}'),
-              onPressed: () =>
-                  _openGuardDialog(context, actor: actor, existing: guard),
-              icon: const Icon(Icons.edit_outlined, size: 16),
-              label: const Text('Edit'),
-            ),
-            OutlinedButton.icon(
-              key: Key('guard_toggle_${guard.userCode}'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor:
-                    guard.isActive ? SentryColors.crimson : p.okText,
-              ),
-              onPressed: () {
-                ref
-                    .read(desktopOpsControllerProvider.notifier)
-                    .toggleGuardActive(guard.userId, actor: actor);
-                setState(() {
-                  _banner =
-                      '${guard.isActive ? 'Deactivated' : 'Activated'} guard ${guard.fullName} (${guard.userCode}).';
-                });
-              },
-              icon: Icon(
-                guard.isActive
-                    ? Icons.person_off_outlined
-                    : Icons.check_circle_outline_rounded,
-                size: 16,
-              ),
-              label: Text(guard.isActive ? 'Deactivate' : 'Activate'),
-            ),
-          ],
+        StatusPill(
+          label: guard.isActive ? 'active' : 'inactive',
+          tone: guard.isActive ? PillTone.ok : PillTone.err,
+        ),
+      ],
+      actions: [
+        OutlinedButton(
+          key: Key('guard_edit_${guard.userCode}'),
+          onPressed: () =>
+              _openGuardDialog(context, actor: actor, existing: guard),
+          child: const Text('Edit'),
+        ),
+        OutlinedButton(
+          key: Key('guard_toggle_${guard.userCode}'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: guard.isActive ? SentryColors.crimson : p.okText,
+          ),
+          onPressed: () {
+            ref
+                .read(desktopOpsControllerProvider.notifier)
+                .toggleGuardActive(guard.userId, actor: actor);
+            setState(() {
+              _banner =
+                  '${guard.isActive ? 'Deactivated' : 'Activated'} guard ${guard.fullName} (${guard.userCode}).';
+            });
+          },
+          child: Text(guard.isActive ? 'Deactivate' : 'Activate'),
         ),
       ],
     );

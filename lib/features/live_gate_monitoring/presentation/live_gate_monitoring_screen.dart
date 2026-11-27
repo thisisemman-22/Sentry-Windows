@@ -227,86 +227,117 @@ class _LiveGateMonitoringScreenState
 
         const SizedBox(height: 18),
 
-        // Compact 4-digit BSUAL- Guest Gate Pass Verification Card (Guard + Admin at gate)
+        // Compact 4-digit BSUAL- Guest Gate Pass Bar (Guard + Admin at gate)
         SentryCard(
           key: const Key('guest_gate_verify_card'),
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionHeader(
-                title: 'Guest Pass Gate Verification (BSUAL-)',
-                subtitle:
-                    'Ask the campus guest for the 4 digits shown in their mobile app after BSUAL- to verify and link entry.',
-              ),
-              const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  Container(
-                    key: const Key('guest_pass_prefix_badge'),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: p.subtle,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: p.line),
-                    ),
-                    child: Text(
-                      'BSUAL-',
-                      style: SentryTheme.mono(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: p.crimson,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: p.crimsonTint,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.qr_code_scanner_rounded,
+                          size: 18,
+                          color: p.crimson,
+                        ),
                       ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: TextField(
-                      key: const Key('guest_pass_4digit_field'),
-                      controller: _guestDigitsCtrl,
-                      maxLength: 4,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: '4 digits',
-                        hintText: '4829',
-                        counterText: '',
+                      const SizedBox(width: 10),
+                      Text(
+                        'Guest pass',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      const InfoHint(
+                        'Enter the 4 digits shown after BSUAL- on the guest mobile app to verify and link gate entry.',
+                      ),
+                    ],
                   ),
-                  FilledButton.icon(
-                    key: const Key('guest_pass_verify_button'),
-                    onPressed: _verifyingGuestPass
-                        ? null
-                        : () async {
-                            setState(() {
-                              _verifyingGuestPass = true;
-                              _guestVerifyError = null;
-                            });
-                            final res = await ref
-                                .read(desktopOpsControllerProvider.notifier)
-                                .verifyGuestGatePass(
-                                  digits4: _guestDigitsCtrl.text,
-                                  laneId: selectedLaneId,
-                                  actor: actor,
-                                );
-                            if (!mounted) return;
-                            setState(() {
-                              _verifyingGuestPass = false;
-                              if (!res.ok) {
-                                _guestVerifyError = res.error?.message ??
-                                    'Verification failed.';
-                              }
-                            });
-                          },
-                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                    label: Text(_verifyingGuestPass
-                        ? 'Verifying…'
-                        : 'Verify Guest Pass'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Container(
+                        key: const Key('guest_pass_prefix_badge'),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: p.subtle,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: p.line),
+                        ),
+                        child: Text(
+                          'BSUAL-',
+                          style: SentryTheme.mono(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: p.crimson,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 120,
+                        child: TextField(
+                          key: const Key('guest_pass_4digit_field'),
+                          controller: _guestDigitsCtrl,
+                          maxLength: 4,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            hintText: '4829',
+                            counterText: '',
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      FilledButton(
+                        key: const Key('guest_pass_verify_button'),
+                        onPressed: _verifyingGuestPass
+                            ? null
+                            : () async {
+                                setState(() {
+                                  _verifyingGuestPass = true;
+                                  _guestVerifyError = null;
+                                });
+                                final res = await ref
+                                    .read(desktopOpsControllerProvider.notifier)
+                                    .verifyGuestGatePass(
+                                      digits4: _guestDigitsCtrl.text,
+                                      laneId: selectedLaneId,
+                                      actor: actor,
+                                    );
+                                if (!mounted) return;
+                                setState(() {
+                                  _verifyingGuestPass = false;
+                                  if (!res.ok) {
+                                    _guestVerifyError = res.error?.message ??
+                                        'Verification failed.';
+                                  }
+                                });
+                              },
+                        child: Text(
+                            _verifyingGuestPass ? 'Verifying…' : 'Verify'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -565,7 +596,7 @@ class _LiveGateMonitoringScreenState
           },
         );
       },
-    ).whenComplete(notesCtrl.dispose);
+    );
   }
 
   void _showTechnicalDetails(BuildContext context, AttemptDto attempt) {
