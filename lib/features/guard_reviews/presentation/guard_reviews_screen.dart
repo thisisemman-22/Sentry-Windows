@@ -281,7 +281,7 @@ class _GuardReviewsScreenState extends ConsumerState<GuardReviewsScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${selectedItem.reviewCaseId} · ${_laneLabel(selectedItem.laneId)}',
+                              _laneLabel(selectedItem.laneId),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],

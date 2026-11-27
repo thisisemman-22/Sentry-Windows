@@ -210,72 +210,55 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
                 final visit = filteredVisits[i];
                 final pf = SentryFixtures.findParticipantByCode(visit.userCode);
                 final vf = SentryFixtures.findVehicleByCode(visit.vehicleCode);
-                final timeAndPill = Wrap(
-                  spacing: 12,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      visit.isActive
-                          ? 'Entered ${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} · ${ManilaTime.formatDuration(visit.duration())}'
-                          : '${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} – ${ManilaTime.formatTimeOnly(visit.exitedAtUtc)}',
-                      style: SentryTheme.mono(
-                        fontSize: 13,
-                        color: p.slate,
-                      ),
-                    ),
+                return SentryRowTile(
+                  leading: PlateBadge(
+                    plateText: vf?.plateDisplay(sysState.rosterMode),
+                    rfidUid: vf?.rfidUid,
+                  ),
+                  title: pf?.displayName(sysState.rosterMode) ?? visit.userCode,
+                  subtitle:
+                      'Bay ${visit.spaceCode ?? 'Unassigned'} · ${visit.isActive ? 'Entered ${ManilaTime.formatTimeOnly(visit.enteredAtUtc)}' : '${ManilaTime.formatTimeOnly(visit.enteredAtUtc)} – ${ManilaTime.formatTimeOnly(visit.exitedAtUtc)}'}',
+                  badges: [
                     StatusPill(
                       label: visit.isActive ? 'Inside campus' : 'Exited',
                       tone: visit.isActive ? PillTone.ok : PillTone.neutral,
                     ),
                   ],
-                );
-
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 680;
-                    return Column(
+                  onTap: () => showDetailsSheet<void>(
+                    context,
+                    frosted: true,
+                    title:
+                        pf?.displayName(sysState.rosterMode) ?? visit.userCode,
+                    subtitle: '${visit.visitCode} · Bay ${visit.spaceCode ?? 'N/A'}',
+                    builder: (ctx) => Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            PlateBadge(
-                              plateText: vf?.plateDisplay(sysState.rosterMode),
-                              rfidUid: vf?.rfidUid,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    pf?.displayName(sysState.rosterMode) ??
-                                        visit.userCode,
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${visit.userCode} · Vehicle ${visit.vehicleCode} · Bay ${visit.spaceCode ?? 'N/A'}',
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!isNarrow) ...[
-                              const SizedBox(width: 14),
-                              timeAndPill,
-                            ],
-                          ],
-                        ),
-                        if (isNarrow) ...[
-                          const SizedBox(height: 8),
-                          timeAndPill,
-                        ],
+                        KeyValueRow(
+                            label: 'User code',
+                            value: visit.userCode,
+                            mono: true),
+                        KeyValueRow(
+                            label: 'Vehicle code',
+                            value: visit.vehicleCode,
+                            mono: true),
+                        KeyValueRow(
+                            label: 'Lot / Bay',
+                            value:
+                                '${visit.lotCode ?? '—'} · ${visit.spaceCode ?? '—'}',
+                            mono: true),
+                        KeyValueRow(
+                            label: 'Entered',
+                            value: ManilaTime.formatDateTime(visit.enteredAtUtc),
+                            mono: true),
+                        if (!visit.isActive)
+                          KeyValueRow(
+                              label: 'Exited',
+                              value:
+                                  ManilaTime.formatDateTime(visit.exitedAtUtc),
+                              mono: true),
                       ],
-                    );
-                  },
+                    ),
+                  ),
                 );
               }),
             ],
@@ -322,59 +305,43 @@ class _AccessLogsScreenState extends ConsumerState<AccessLogsScreen> {
             Builder(builder: (context) {
               final att = sysState.attemptHistory[i];
               final outcome = att.latestDecision?.outcome ?? 'pending';
-              final pills = Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
+              final pf = SentryFixtures.findParticipantByCode(att.userCode);
+              return SentryRowTile(
+                leading: PlateBadge(
+                  plateText: att.plateText,
+                  rfidUid: att.rfidUid,
+                  isCompact: true,
+                ),
+                title: att.latestDecision?.reasonMessage ?? att.state,
+                subtitle:
+                    '${pf?.displayName(sysState.rosterMode) ?? att.userCode ?? 'Unregistered'} · ${ManilaTime.formatTimeOnly(att.startedAtUtc)}',
+                badges: [
                   StatusPill.fromDecisionOutcome(outcome),
-                  StatusPill.fromAttemptState(att.state),
                 ],
-              );
-
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 680;
-                  return Column(
+                onTap: () => showDetailsSheet<void>(
+                  context,
+                  frosted: true,
+                  title: 'Gate attempt details',
+                  subtitle: att.laneId,
+                  builder: (ctx) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          PlateBadge(
-                            plateText: att.plateText,
-                            rfidUid: att.rfidUid,
-                            isCompact: true,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  att.latestDecision?.reasonMessage ?? att.state,
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${att.userCode ?? 'Unregistered'} · ${att.vehicleCode ?? 'Unknown vehicle'} · ${att.laneId}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!isNarrow) ...[
-                            const SizedBox(width: 14),
-                            pills,
-                          ],
-                        ],
-                      ),
-                      if (isNarrow) ...[
-                        const SizedBox(height: 8),
-                        pills,
-                      ],
+                      KeyValueRow(label: 'State', value: att.state, mono: true),
+                      KeyValueRow(
+                          label: 'User',
+                          value: att.userCode ?? 'Unregistered',
+                          mono: true),
+                      KeyValueRow(
+                          label: 'Vehicle',
+                          value: att.vehicleCode ?? 'Unknown',
+                          mono: true),
+                      KeyValueRow(
+                          label: 'Correlation ID',
+                          value: att.correlationId,
+                          mono: true),
                     ],
-                  );
-                },
+                  ),
+                ),
               );
             }),
           ],

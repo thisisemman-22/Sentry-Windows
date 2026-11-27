@@ -110,8 +110,6 @@ class SentryTheme {
       labelSmall: s(12, FontWeight.w600, p.muted, height: 1.2),
     );
 
-    final focusRing = BorderSide(color: p.crimson, width: 2);
-
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -161,43 +159,44 @@ class SentryTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: p.subtle,
+        fillColor: isDark ? const Color(0xFF151519) : const Color(0xFFF8FAFC),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: s(14.5, FontWeight.w400, p.muted),
-        labelStyle: s(14, FontWeight.w600, p.slate),
-        floatingLabelStyle: s(14, FontWeight.w700, p.crimson),
-        helperStyle: s(12.5, FontWeight.w400, p.muted),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        hintStyle: s(14, FontWeight.w400, p.muted),
+        labelStyle: s(13.5, FontWeight.w600, p.slate),
+        floatingLabelStyle: s(13.5, FontWeight.w700, p.crimson),
+        helperStyle: s(12, FontWeight.w400, p.muted),
         errorStyle: s(12.5, FontWeight.w600, p.errText),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: p.line, width: 1.5),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: p.line, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: p.line, width: 1.5),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: p.line, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: focusRing,
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: p.crimson, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: p.err, width: 1.5),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: p.err, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: p.err, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: p.err, width: 1.5),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: SentryColors.crimson,
           foregroundColor: Colors.white,
-          minimumSize: const Size(44, 46),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: const StadiumBorder(),
-          textStyle: s(14, FontWeight.w700, Colors.white, height: 1.1),
+          minimumSize: const Size(40, 42),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: s(13.5, FontWeight.w700, Colors.white, height: 1.1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -205,30 +204,45 @@ class SentryTheme {
           backgroundColor: SentryColors.crimson,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size(44, 46),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: const StadiumBorder(),
-          textStyle: s(14, FontWeight.w700, Colors.white, height: 1.1),
+          minimumSize: const Size(40, 42),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: s(13.5, FontWeight.w700, Colors.white, height: 1.1),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: p.text,
-          minimumSize: const Size(44, 46),
-          side: BorderSide(color: p.line, width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: const StadiumBorder(),
-          textStyle: s(14, FontWeight.w700, p.text, height: 1.1),
+          minimumSize: const Size(38, 40),
+          side: BorderSide(color: p.line, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: s(13.5, FontWeight.w600, p.text, height: 1.1),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: p.crimsonHover,
-          minimumSize: const Size(44, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          shape: const StadiumBorder(),
-          textStyle: s(14, FontWeight.w700, p.crimsonHover, height: 1.1),
+          minimumSize: const Size(40, 38),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: s(13.5, FontWeight.w600, p.crimsonHover, height: 1.1),
         ),
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingRowColor:
+            WidgetStatePropertyAll(p.subtle.withValues(alpha: 0.7)),
+        headingRowHeight: 44,
+        dataRowMinHeight: 48,
+        dataRowMaxHeight: 56,
+        horizontalMargin: 18,
+        columnSpacing: 28,
+        dividerThickness: 0.6,
+        headingTextStyle: eyebrow(color: p.muted),
+        dataTextStyle: s(13.5, FontWeight.w500, p.text),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(

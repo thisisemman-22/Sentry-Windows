@@ -39,6 +39,7 @@ class DeviceMonitoringScreen extends ConsumerWidget {
         if (sysState.devices.isEmpty)
           SentryCard(
             child: EmptyState(
+              showBrandLogo: true,
               icon: Icons.router_outlined,
               title: 'No site devices loaded',
               message:
@@ -56,18 +57,68 @@ class DeviceMonitoringScreen extends ConsumerWidget {
             ),
           )
         else
-          for (var i = 0; i < sysState.devices.length; i++) ...[
-            if (i > 0) const SizedBox(height: 12),
-            Reveal(
-              index: i + 1,
-              child: _DeviceRowCard(
-                device: sysState.devices[i],
-                palette: p,
-                onInspect: () =>
-                    _showDeviceDetails(context, sysState.devices[i]),
-              ),
-            ),
-          ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final twoCols = constraints.maxWidth >= 900;
+              if (!twoCols) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < sysState.devices.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 12),
+                      Reveal(
+                        index: i + 1,
+                        child: _DeviceRowCard(
+                          device: sysState.devices[i],
+                          palette: p,
+                          onInspect: () =>
+                              _showDeviceDetails(context, sysState.devices[i]),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < sysState.devices.length; i += 2) ...[
+                    if (i > 0) const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Reveal(
+                            index: i + 1,
+                            child: _DeviceRowCard(
+                              device: sysState.devices[i],
+                              palette: p,
+                              onInspect: () => _showDeviceDetails(
+                                  context, sysState.devices[i]),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: i + 1 < sysState.devices.length
+                              ? Reveal(
+                                  index: i + 2,
+                                  child: _DeviceRowCard(
+                                    device: sysState.devices[i + 1],
+                                    palette: p,
+                                    onInspect: () => _showDeviceDetails(
+                                        context, sysState.devices[i + 1]),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
       ],
     );
   }

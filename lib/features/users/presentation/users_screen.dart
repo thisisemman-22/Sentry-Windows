@@ -218,40 +218,61 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // General Password Control Card
+        // General Password Control Bar
         SentryCard(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 16,
-            runSpacing: 12,
+            runSpacing: 10,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'General First-Login Password',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    revealed != null
-                        ? '$revealed  (24h default expiry · audited)'
-                        : '${gp?.maskedValue ?? '••••••••••••'}  (24h default expiry)',
-                    key: const Key('general_password_display_text'),
-                    style: SentryTheme.mono(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: revealed != null ? p.crimson : p.muted,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: p.crimsonTint,
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    child: Icon(
+                      Icons.key_outlined,
+                      size: 18,
+                      color: p.crimson,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'General First-Login Password',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        revealed ?? gp?.maskedValue ?? '••••••••••••',
+                        key: const Key('general_password_display_text'),
+                        style: SentryTheme.mono(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: revealed != null ? p.crimson : p.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 6),
+                  const InfoHint(
+                    'Temporary password assigned on account creation or reset (24h expiry). Showing clears on hide.',
                   ),
                 ],
               ),
               Wrap(
-                spacing: 10,
+                spacing: 8,
                 runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
@@ -267,15 +288,14 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                       revealed != null
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      size: 17,
+                      size: 16,
                     ),
                     label: Text(revealed != null ? 'Hide' : 'Show'),
                   ),
-                  FilledButton.icon(
+                  FilledButton(
                     key: const Key('general_password_change_btn'),
                     onPressed: () => _openChangeGeneralPasswordDialog(actor),
-                    icon: const Icon(Icons.key_outlined, size: 17),
-                    label: const Text('Change'),
+                    child: const Text('Change'),
                   ),
                 ],
               ),
@@ -354,6 +374,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
               const SizedBox(height: 18),
               if (filtered.isEmpty)
                 const EmptyState(
+                  showBrandLogo: true,
                   icon: Icons.people_outline_rounded,
                   title: 'No registered users loaded',
                   message:
@@ -366,83 +387,50 @@ class _UsersScreenState extends ConsumerState<UsersScreen> {
                     final u = filtered[i];
                     final status = opsCtrl.userStatusFor(u);
                     final isSelf = u.userId == actor.userId;
-                    return InkWell(
+                    return SentryRowTile(
                       key: Key('user_row_${u.userCode}'),
-                      onTap: () => _openUserDetailSheet(context, actor, u),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 6,
-                        ),
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 420),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${u.fullName} · ${u.userCode}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${u.email} · ${u.roleCode}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                StatusPill(
-                                  label: status == 'first_login_required'
-                                      ? 'First login required'
-                                      : status,
-                                  tone: status == 'active'
-                                      ? PillTone.ok
-                                      : status == 'suspended'
-                                          ? PillTone.err
-                                          : PillTone.warn,
-                                ),
-                                Tooltip(
-                                  message: isSelf
-                                      ? 'A second Administrator must reset another Admin account'
-                                      : 'Reset forgotten password to General Password',
-                                  child: OutlinedButton.icon(
-                                    key: Key('reset_user_pwd_${u.userCode}'),
-                                    onPressed: isSelf
-                                        ? null
-                                        : () => _confirmResetPassword(
-                                              context,
-                                              actor,
-                                              u,
-                                            ),
-                                    icon: const Icon(Icons.lock_reset_rounded,
-                                        size: 16),
-                                    label: const Text('Reset Password'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      leading: MonogramAvatar(
+                        name: u.fullName,
+                        highlight: u.roleCode == 'administrator',
                       ),
+                      title: u.fullName,
+                      subtitle: '${u.roleCode} · ${u.email}',
+                      badges: [
+                        StatusPill(
+                          label: u.userCode,
+                          tone: PillTone.neutral,
+                          monospace: true,
+                        ),
+                        StatusPill(
+                          label: status == 'first_login_required'
+                              ? 'First login required'
+                              : status,
+                          tone: status == 'active'
+                              ? PillTone.ok
+                              : status == 'suspended'
+                                  ? PillTone.err
+                                  : PillTone.warn,
+                        ),
+                      ],
+                      actions: [
+                        Tooltip(
+                          message: isSelf
+                              ? 'A second Administrator must reset another Admin account'
+                              : 'Reset forgotten password to General Password',
+                          child: OutlinedButton(
+                            key: Key('reset_user_pwd_${u.userCode}'),
+                            onPressed: isSelf
+                                ? null
+                                : () => _confirmResetPassword(
+                                      context,
+                                      actor,
+                                      u,
+                                    ),
+                            child: const Text('Reset Password'),
+                          ),
+                        ),
+                      ],
+                      onTap: () => _openUserDetailSheet(context, actor, u),
                     );
                   }),
                 ],

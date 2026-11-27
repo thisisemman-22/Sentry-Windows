@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/network/api_envelope.dart';
 import '../../../core/theme/sentry_colors.dart';
-import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/models/audit_models.dart';
 
@@ -94,6 +93,7 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
               const SizedBox(height: 16),
               if (filtered.isEmpty)
                 const EmptyState(
+                  showBrandLogo: true,
                   icon: Icons.fact_check_outlined,
                   title: 'No matching audit entries',
                   message:
@@ -101,7 +101,7 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
                 )
               else
                 for (var i = 0; i < filtered.length; i++) ...[
-                  if (i > 0) Divider(color: p.line, height: 18),
+                  if (i > 0) Divider(color: p.line, height: 1),
                   _buildLogRow(context, p, filtered[i]),
                 ],
             ],
@@ -116,74 +116,45 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
     SentryPalette p,
     AuditLogDto log,
   ) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    final prettyAction = log.action.replaceAll('_', ' ');
+    return SentryRowTile(
+      title: log.summary,
+      subtitle:
+          '${log.actorUserCode} (${log.actorRole}) · ${ManilaTime.formatDateTime(log.occurredAtUtc)}',
+      badges: [
+        StatusPill(
+          label: prettyAction,
+          tone: PillTone.info,
+        ),
+      ],
       onTap: () {
         showDetailsSheet<void>(
           context,
-          title: log.action,
+          frosted: true,
+          title: prettyAction,
           subtitle: ManilaTime.formatDateTime(log.occurredAtUtc),
           builder: (ctx) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              KeyValueRow(label: 'Actor', value: '${log.actorUserCode} (${log.actorRole})', mono: true),
-              KeyValueRow(label: 'Resource', value: '${log.resourceType} · ${log.resourceId}', mono: true),
+              KeyValueRow(
+                  label: 'Actor',
+                  value: '${log.actorUserCode} (${log.actorRole})',
+                  mono: true),
+              KeyValueRow(
+                  label: 'Resource',
+                  value: '${log.resourceType} · ${log.resourceId}',
+                  mono: true),
               KeyValueRow(label: 'Summary', value: log.summary),
               const Divider(height: 22),
               KeyValueRow(label: 'Audit ID', value: log.auditId, mono: true),
-              KeyValueRow(label: 'Request ID', value: log.requestId, mono: true),
-              KeyValueRow(label: 'Actor UUID', value: log.actorUserId, mono: true),
+              KeyValueRow(
+                  label: 'Request ID', value: log.requestId, mono: true),
+              KeyValueRow(
+                  label: 'Actor UUID', value: log.actorUserId, mono: true),
             ],
           ),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          runSpacing: 6,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 680),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      StatusPill(
-                        label: log.action,
-                        tone: PillTone.info,
-                        monospace: true,
-                      ),
-                      Text(
-                        '${log.actorUserCode} (${log.actorRole})',
-                        style: SentryTheme.mono(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: p.text,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    log.summary,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              ManilaTime.formatDateTime(log.occurredAtUtc),
-              style: SentryTheme.mono(fontSize: 12, color: p.muted),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

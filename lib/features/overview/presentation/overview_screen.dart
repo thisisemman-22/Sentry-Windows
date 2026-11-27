@@ -1471,8 +1471,8 @@ class _SystemHealthGlassCard extends StatelessWidget {
 
     return SpatialGlass(
       key: const Key('dashboard_system_health_card'),
-      radius: 24,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      radius: 22,
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1481,7 +1481,7 @@ class _SystemHealthGlassCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'System health',
-                  style: panelTitleStyle(p, size: 17),
+                  style: panelTitleStyle(p, size: 16.5),
                 ),
               ),
               SoftChip(
@@ -1494,28 +1494,17 @@ class _SystemHealthGlassCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              SoftChip(
-                hasHealth
-                    ? 'Scheduler: ${health.schedulerStatus == 'running' ? 'Running' : 'Degraded'}'
-                    : 'Scheduler: —',
-                tone: hasHealth && health.schedulerStatus == 'running'
-                    ? SoftChipTone.ok
-                    : SoftChipTone.neutral,
-              ),
-              SoftChip(
-                totalDevices > 0
-                    ? 'Cameras: $onlineDevices/$totalDevices online'
-                    : 'Cameras: —',
-                tone: totalDevices > 0 && onlineDevices == totalDevices
-                    ? SoftChipTone.ok
-                    : SoftChipTone.neutral,
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            !hasHealth
+                ? 'Scheduler & cameras awaiting connection'
+                : 'Scheduler ${health.schedulerStatus == 'running' ? 'running' : 'degraded'} · $onlineDevices/$totalDevices cameras online',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: p.muted,
+                  fontSize: 12.5,
+                ),
           ),
           if (failedLetters.isNotEmpty) ...[
             const SizedBox(height: 12),

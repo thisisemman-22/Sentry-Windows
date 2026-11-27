@@ -1457,25 +1457,12 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
 
     if (sysState.participantDirectory.isEmpty) {
       return const SentryCard(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Callout(
-              tone: PillTone.info,
-              icon: Icons.extension_outlined,
-              title: 'Planned Extension — Outside Phase 4 OpenAPI Scope',
-              message:
-                  'Biometric RA 10173 facial enrollment endpoints are scheduled for a subsequent backend release.',
-            ),
-            SizedBox(height: 16),
-            EmptyState(
-              icon: Icons.face_retouching_natural_outlined,
-              title: 'No registered users available',
-              message:
-                  'Register a user in Drivers & vehicles (Planned) first or sync the participant directory.',
-            ),
-          ],
+        child: EmptyState(
+          showBrandLogo: true,
+          icon: Icons.face_retouching_natural_outlined,
+          title: 'No registered users available',
+          message:
+              'Register a user in Register User first or sync the participant directory.',
         ),
       );
     }
@@ -1663,9 +1650,9 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
         children: [
           SectionHeader(
             title: 'Enrollment status',
-            subtitle: '${selectedUser.fullName} (${selectedUser.userCode})',
+            subtitle: '${selectedUser.fullName} · ${selectedUser.userCode}',
             hint:
-                'GET /api/v1/admin/users/${selectedUser.userId}/face-enrollment — never stores or returns raw face photos.',
+                'ArcFace template metadata only; raw face photos are never stored or returned.',
             trailing: StatusPill(
               key: const Key('face_enrollment_status_pill'),
               label: statusDto.status,
@@ -1675,94 +1662,106 @@ class _AdministrationScreenState extends ConsumerState<AdministrationScreen> {
           ),
           const SizedBox(height: 16),
           KeyValueRow(
-            label: 'User ID',
-            value: selectedUser.userId,
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'Status',
-            value: statusDto.status,
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'Face template ID',
-            value: statusDto.faceTemplateId ?? 'None (not_enrolled)',
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'ArcFace model version',
-            value: statusDto.modelVersion,
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'Encrypted artifact ref',
-            value: statusDto.artifactReference ?? '—',
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'Enrolled at (Asia/Manila)',
+            label: 'Enrolled at',
             value: ManilaTime.formatDateTime(statusDto.enrolledAtUtc),
             mono: true,
           ),
           KeyValueRow(
-            label: 'Retention expires at',
-            value: ManilaTime.formatDateTime(statusDto.retentionExpiresAtUtc),
-            mono: true,
-          ),
-          KeyValueRow(
-            label: 'RA 10173 consent version',
+            label: 'Consent version',
             value: statusDto.consentVersion,
             mono: true,
           ),
           const SizedBox(height: 18),
-          OutlinedButton.icon(
-            key: const Key('revoke_face_enrollment_button'),
-            onPressed: isEnrolled && !_isRevokingEnrollment
-                ? () => _confirmAndRevokeFaceEnrollment(actor, selectedUser)
-                : null,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: SentryColors.crimson,
-            ),
-            icon: const Icon(Icons.delete_forever_outlined, size: 18),
-            label: Text(
-              _isRevokingEnrollment
-                  ? 'Deleting embedding…'
-                  : 'Revoke & Delete Embedding',
-            ),
-          ),
-          const SizedBox(height: 16),
-          Builder(
-            builder: (context) {
-              final history = ref
-                  .watch(desktopOpsControllerProvider)
-                  .faceHistory
-                  .where((h) => h.userCode == selectedUser.userCode)
-                  .take(4)
-                  .toList();
-              if (history.isEmpty) {
-                return Text(
-                  'No recent RA 10173 consent history logged in this session.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Consent & enrollment history',
-                    style: SentryTheme.eyebrow(color: p.muted),
-                  ),
-                  const SizedBox(height: 6),
-                  for (final h in history)
-                    KeyValueRow(
-                      label: '${h.action} (${h.consentVersion})',
-                      value:
-                          '${h.actorUserCode} · ${ManilaTime.formatDateTime(h.occurredAtUtc)}',
-                      mono: true,
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('revoke_face_enrollment_button'),
+                onPressed: isEnrolled && !_isRevokingEnrollment
+                    ? () => _confirmAndRevokeFaceEnrollment(actor, selectedUser)
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SentryColors.crimson,
+                ),
+                icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                label: Text(
+                  _isRevokingEnrollment
+                      ? 'Deleting embedding…'
+                      : 'Revoke & Delete Embedding',
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  final history = ref
+                      .read(desktopOpsControllerProvider)
+                      .faceHistory
+                      .where((h) => h.userCode == selectedUser.userCode)
+                      .toList();
+                  showDetailsSheet<void>(
+                    context,
+                    frosted: true,
+                    title: 'Biometric metadata',
+                    subtitle:
+                        '${selectedUser.fullName} (${selectedUser.userCode})',
+                    builder: (ctx) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        KeyValueRow(
+                          label: 'User ID',
+                          value: selectedUser.userId,
+                          mono: true,
+                        ),
+                        KeyValueRow(
+                          label: 'Status',
+                          value: statusDto.status,
+                          mono: true,
+                        ),
+                        KeyValueRow(
+                          label: 'Face template ID',
+                          value:
+                              statusDto.faceTemplateId ?? 'None (not_enrolled)',
+                          mono: true,
+                        ),
+                        KeyValueRow(
+                          label: 'Model version',
+                          value: statusDto.modelVersion,
+                          mono: true,
+                        ),
+                        KeyValueRow(
+                          label: 'Encrypted ref',
+                          value: statusDto.artifactReference ?? '—',
+                          mono: true,
+                        ),
+                        KeyValueRow(
+                          label: 'Retention expires',
+                          value: ManilaTime.formatDateTime(
+                            statusDto.retentionExpiresAtUtc,
+                          ),
+                          mono: true,
+                        ),
+                        if (history.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          const SectionHeader(
+                            title: 'Consent & enrollment history',
+                          ),
+                          const SizedBox(height: 8),
+                          for (final h in history)
+                            KeyValueRow(
+                              label: '${h.action} (${h.consentVersion})',
+                              value:
+                                  '${h.actorUserCode} · ${ManilaTime.formatDateTime(h.occurredAtUtc)}',
+                              mono: true,
+                            ),
+                        ],
+                      ],
                     ),
-                ],
-              );
-            },
+                  );
+                },
+                icon: const Icon(Icons.info_outline_rounded, size: 17),
+                label: const Text('Inspect technical metadata'),
+              ),
+            ],
           ),
         ],
       ),

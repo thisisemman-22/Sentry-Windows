@@ -127,7 +127,7 @@ class _ParkingManagementScreenState
         const PageIntro(
           title: 'Parking map',
           subtitle:
-              'Surveyed BatStateU Alangilan blueprints (Lots B1–B5) and campus parking rules. Click any bay for Inspector details.',
+              'BatStateU Alangilan parking blueprints (Lots B1–B5) and campus rules.',
         ),
         const SizedBox(height: 18),
         SentryCard(
@@ -361,18 +361,8 @@ class _ParkingManagementScreenState
                 child: Column(
                   children: [
                     KeyValueRow(
-                      label: 'Slot / Space',
-                      value: '${space.displaySlotLabel} (${space.spaceCode})',
-                      mono: true,
-                    ),
-                    KeyValueRow(
-                      label: 'Lot code',
-                      value: space.lotCode,
-                      mono: true,
-                    ),
-                    KeyValueRow(
-                      label: 'Compatibility',
-                      value: space.compatibility,
+                      label: 'Bay',
+                      value: '${space.displaySlotLabel} (${space.lotCode})',
                       mono: true,
                     ),
                     KeyValueRow(
@@ -398,26 +388,57 @@ class _ParkingManagementScreenState
                           : 'None',
                       mono: true,
                     ),
-                    KeyValueRow(
-                      label: 'Last updated',
-                      value:
-                          ManilaTime.formatTimeOnly(space.lastObservedAtUtc),
-                      mono: true,
-                    ),
-                    KeyValueRow(
-                      label: 'Space UUID',
-                      value: space.spaceId,
-                      mono: true,
-                    ),
-                    KeyValueRow(
-                      label: 'Assignment ID',
-                      value: space.assignmentId ?? 'None',
-                      mono: true,
-                    ),
-                    KeyValueRow(
-                      label: 'Active visit ID',
-                      value: space.visitId ?? 'None (null while held)',
-                      mono: true,
+                    Material(
+                      type: MaterialType.transparency,
+                      child: Theme(
+                        data: Theme.of(context)
+                            .copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: Text(
+                            'Technical metadata',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  color: p.muted,
+                                ),
+                          ),
+                          children: [
+                            KeyValueRow(
+                              label: 'Space code',
+                              value: space.spaceCode,
+                              mono: true,
+                            ),
+                            KeyValueRow(
+                              label: 'Compatibility',
+                              value: space.compatibility,
+                              mono: true,
+                            ),
+                            KeyValueRow(
+                              label: 'Last updated',
+                              value: ManilaTime.formatTimeOnly(
+                                  space.lastObservedAtUtc),
+                              mono: true,
+                            ),
+                            KeyValueRow(
+                              label: 'Space UUID',
+                              value: space.spaceId,
+                              mono: true,
+                            ),
+                            KeyValueRow(
+                              label: 'Assignment ID',
+                              value: space.assignmentId ?? 'None',
+                              mono: true,
+                            ),
+                            KeyValueRow(
+                              label: 'Active visit ID',
+                              value: space.visitId ?? 'None',
+                              mono: true,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

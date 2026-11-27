@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/motion/motion.dart';
 import '../../../core/theme/sentry_colors.dart';
-import '../../../core/theme/sentry_theme.dart';
 import '../../../core/widgets/plate_badge.dart';
 import '../../../core/widgets/ui/sentry_ui.dart';
 import '../../../shared/models/auth_models.dart';
@@ -99,6 +98,7 @@ class _VehiclesRfidScreenState extends ConsumerState<VehiclesRfidScreen> {
           const SizedBox(height: 16),
           if (vehicles.isEmpty)
             const EmptyState(
+              showBrandLogo: true,
               icon: Icons.directions_car_outlined,
               title: 'No vehicles loaded',
               message:
@@ -107,87 +107,89 @@ class _VehiclesRfidScreenState extends ConsumerState<VehiclesRfidScreen> {
           else
             for (var i = 0; i < vehicles.length; i++) ...[
               if (i > 0) Divider(color: p.line, height: 1),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PlateBadge(
-                          plateText: vehicles[i].v.plateNumberDisplay,
-                          rfidUid: vehicles[i].v.rfidUid,
-                          isCompact: true,
-                        ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${vehicles[i].v.vehicleCode} · ${vehicles[i].owner.fullName} (${vehicles[i].owner.userCode})',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              Text(
-                                '${vehicles[i].v.vehicleType} · status: ${vehicles[i].v.approvalStatus}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+              SentryRowTile(
+                leading: PlateBadge(
+                  plateText: vehicles[i].v.plateNumberDisplay,
+                  rfidUid: vehicles[i].v.rfidUid,
+                  isCompact: true,
+                ),
+                title: vehicles[i].owner.fullName,
+                subtitle:
+                    '${vehicles[i].v.vehicleType == 'motorcycle' ? 'Motorcycle' : 'Car'} · ${vehicles[i].v.vehicleCode}',
+                badges: [
+                  StatusPill(
+                    label: vehicles[i].v.isGateEligible
+                        ? 'Gate Eligible'
+                        : vehicles[i].v.approvalStatus,
+                    tone: vehicles[i].v.isGateEligible
+                        ? PillTone.ok
+                        : PillTone.warn,
+                  ),
+                ],
+                actions: [
+                  OutlinedButton(
+                    key: Key('edit_vehicle_${vehicles[i].v.vehicleCode}'),
+                    onPressed: () => _openEditVehicleDialog(
+                      actor,
+                      vehicles[i].owner,
+                      vehicles[i].v,
                     ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        StatusPill(
-                          label: vehicles[i].v.isGateEligible
-                              ? 'Gate Eligible'
-                              : vehicles[i].v.approvalStatus,
-                          tone: vehicles[i].v.isGateEligible
-                              ? PillTone.ok
-                              : PillTone.warn,
-                        ),
-                        OutlinedButton(
-                          key: Key('edit_vehicle_${vehicles[i].v.vehicleCode}'),
-                          onPressed: () => _openEditVehicleDialog(
-                            actor,
-                            vehicles[i].owner,
-                            vehicles[i].v,
-                          ),
-                          child: const Text('Edit'),
-                        ),
-                        OutlinedButton(
-                          key:
-                              Key('remove_vehicle_${vehicles[i].v.vehicleCode}'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: SentryColors.crimson,
-                          ),
-                          onPressed: () {
-                            ref
-                                .read(sentryScenarioProvider.notifier)
-                                .editOrRemoveParticipantVehicle(
-                                  actor: actor,
-                                  userCode: vehicles[i].owner.userCode,
-                                  vehicleCode: vehicles[i].v.vehicleCode,
-                                  remove: true,
-                                );
-                          },
-                          child: const Text('Remove'),
-                        ),
-                      ],
+                    child: const Text('Edit'),
+                  ),
+                  OutlinedButton(
+                    key: Key('remove_vehicle_${vehicles[i].v.vehicleCode}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: SentryColors.crimson,
                     ),
-                  ],
+                    onPressed: () {
+                      ref
+                          .read(sentryScenarioProvider.notifier)
+                          .editOrRemoveParticipantVehicle(
+                            actor: actor,
+                            userCode: vehicles[i].owner.userCode,
+                            vehicleCode: vehicles[i].v.vehicleCode,
+                            remove: true,
+                          );
+                    },
+                    child: const Text('Remove'),
+                  ),
+                ],
+                onTap: () => showDetailsSheet<void>(
+                  context,
+                  frosted: true,
+                  title:
+                      '${vehicles[i].v.vehicleCode} · ${vehicles[i].owner.fullName}',
+                  subtitle:
+                      'Registered ${vehicles[i].v.vehicleType} credentials',
+                  builder: (ctx) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      KeyValueRow(
+                          label: 'Owner',
+                          value:
+                              '${vehicles[i].owner.fullName} (${vehicles[i].owner.userCode})'),
+                      KeyValueRow(
+                          label: 'Plate',
+                          value: vehicles[i].v.plateNumberDisplay ?? '—',
+                          mono: true),
+                      KeyValueRow(
+                          label: 'RFID UID',
+                          value: vehicles[i].v.rfidUid ?? '—',
+                          mono: true),
+                      KeyValueRow(
+                          label: 'Approval',
+                          value: vehicles[i].v.approvalStatus,
+                          mono: true),
+                      KeyValueRow(
+                          label: 'Authorization',
+                          value: vehicles[i].v.authorizationStatus,
+                          mono: true),
+                      KeyValueRow(
+                          label: 'Vehicle ID',
+                          value: vehicles[i].v.vehicleId,
+                          mono: true),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -242,77 +244,52 @@ class _VehiclesRfidScreenState extends ConsumerState<VehiclesRfidScreen> {
           else
             for (var i = 0; i < requests.length; i++) ...[
               if (i > 0) Divider(color: p.line, height: 1),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${requests[i].userFullName} (${requests[i].userCode} · ${requests[i].userRole})',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          '${requests[i].vehicleType} · Plate: ${requests[i].plateNumber ?? 'None'} · RFID: ${requests[i].rfidUid ?? 'None'}',
-                          style: SentryTheme.mono(fontSize: 12.5, color: p.muted),
-                        ),
-                        if (requests[i].rejectionReason != null)
-                          Text(
-                            'Reason: ${requests[i].rejectionReason}',
-                            style: TextStyle(fontSize: 12, color: p.errText),
-                          ),
-                      ],
+              SentryRowTile(
+                leading: PlateBadge(
+                  plateText: requests[i].plateNumber,
+                  rfidUid: requests[i].rfidUid,
+                  isCompact: true,
+                ),
+                title: requests[i].userFullName,
+                subtitle: requests[i].rejectionReason != null
+                    ? 'Reason: ${requests[i].rejectionReason}'
+                    : '${requests[i].vehicleType == 'motorcycle' ? 'Motorcycle' : 'Car'} · ${requests[i].userRole}',
+                badges: [
+                  StatusPill(
+                    label: requests[i].status,
+                    tone: requests[i].status == 'approved'
+                        ? PillTone.ok
+                        : requests[i].status == 'rejected'
+                            ? PillTone.err
+                            : PillTone.warn,
+                  ),
+                ],
+                actions: [
+                  if (requests[i].status == 'pending') ...[
+                    FilledButton(
+                      key: Key('approve_vehicle_req_${requests[i].requestId}'),
+                      onPressed: () {
+                        ref
+                            .read(desktopOpsControllerProvider.notifier)
+                            .reviewVehicleRequest(
+                              requestId: requests[i].requestId,
+                              approve: true,
+                              actor: actor,
+                            );
+                      },
+                      child: const Text('Approve'),
                     ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        StatusPill(
-                          label: requests[i].status,
-                          tone: requests[i].status == 'approved'
-                              ? PillTone.ok
-                              : requests[i].status == 'rejected'
-                                  ? PillTone.err
-                                  : PillTone.warn,
-                        ),
-                        if (requests[i].status == 'pending') ...[
-                          FilledButton(
-                            key: Key(
-                                'approve_vehicle_req_${requests[i].requestId}'),
-                            onPressed: () {
-                              ref
-                                  .read(desktopOpsControllerProvider.notifier)
-                                  .reviewVehicleRequest(
-                                    requestId: requests[i].requestId,
-                                    approve: true,
-                                    actor: actor,
-                                  );
-                            },
-                            child: const Text('Approve'),
-                          ),
-                          OutlinedButton(
-                            key: Key(
-                                'reject_vehicle_req_${requests[i].requestId}'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: SentryColors.crimson,
-                            ),
-                            onPressed: () =>
-                                _openRejectRequestDialog(actor, requests[i]),
-                            child: const Text('Reject'),
-                          ),
-                        ],
-                      ],
+                    OutlinedButton(
+                      key: Key('reject_vehicle_req_${requests[i].requestId}'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SentryColors.crimson,
+                      ),
+                      onPressed: () =>
+                          _openRejectRequestDialog(actor, requests[i]),
+                      child: const Text('Reject'),
                     ),
                   ],
-                ),
+                ],
               ),
             ],
         ],
@@ -350,69 +327,52 @@ class _VehiclesRfidScreenState extends ConsumerState<VehiclesRfidScreen> {
           else
             for (var i = 0; i < ops.rfidTags.length; i++) ...[
               if (i > 0) Divider(color: p.line, height: 1),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ops.rfidTags[i].rfidUid,
-                          style: SentryTheme.mono(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: p.text,
-                          ),
-                        ),
-                        Text(
-                          ops.rfidTags[i].assignedUserCode != null
-                              ? 'Assigned: ${ops.rfidTags[i].assignedUserCode} (${ops.rfidTags[i].assignedVehicleCode ?? '—'})'
-                              : 'Unassigned',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+              SentryRowTile(
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: p.subtle,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.nfc_rounded, size: 18, color: p.slate),
+                ),
+                title: ops.rfidTags[i].rfidUid,
+                subtitle: ops.rfidTags[i].assignedUserCode != null
+                    ? 'Assigned to ${ops.rfidTags[i].assignedUserCode} · ${ops.rfidTags[i].assignedVehicleCode ?? '—'}'
+                    : 'Unassigned tag',
+                badges: [
+                  StatusPill(
+                    label: ops.rfidTags[i].status,
+                    tone: ops.rfidTags[i].status == 'active'
+                        ? PillTone.ok
+                        : ops.rfidTags[i].status == 'deactivated'
+                            ? PillTone.err
+                            : PillTone.neutral,
+                  ),
+                ],
+                actions: [
+                  if (ops.rfidTags[i].status != 'deactivated' &&
+                      ops.rfidTags[i].status != 'replaced') ...[
+                    OutlinedButton(
+                      onPressed: () {
+                        ref
+                            .read(desktopOpsControllerProvider.notifier)
+                            .updateRfidTag(
+                              tagId: ops.rfidTags[i].tagId,
+                              status: 'deactivated',
+                              actor: actor,
+                            );
+                      },
+                      child: const Text('Deactivate'),
                     ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        StatusPill(
-                          label: ops.rfidTags[i].status,
-                          tone: ops.rfidTags[i].status == 'active'
-                              ? PillTone.ok
-                              : ops.rfidTags[i].status == 'deactivated'
-                                  ? PillTone.err
-                                  : PillTone.neutral,
-                        ),
-                        if (ops.rfidTags[i].status != 'deactivated' &&
-                            ops.rfidTags[i].status != 'replaced') ...[
-                          OutlinedButton(
-                            onPressed: () {
-                              ref
-                                  .read(desktopOpsControllerProvider.notifier)
-                                  .updateRfidTag(
-                                    tagId: ops.rfidTags[i].tagId,
-                                    status: 'deactivated',
-                                    actor: actor,
-                                  );
-                            },
-                            child: const Text('Deactivate'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () =>
-                                _openReplaceTagDialog(actor, ops.rfidTags[i]),
-                            child: const Text('Replace'),
-                          ),
-                        ],
-                      ],
+                    OutlinedButton(
+                      onPressed: () =>
+                          _openReplaceTagDialog(actor, ops.rfidTags[i]),
+                      child: const Text('Replace'),
                     ),
                   ],
-                ),
+                ],
               ),
             ],
         ],
