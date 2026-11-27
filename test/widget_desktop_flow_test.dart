@@ -27,7 +27,9 @@ void main() {
     // 1. Verify SENTRY Login Screen renders
     expect(find.text('Sign in to Guard & ICT Console'), findsOneWidget);
 
-    // Sign in as Guard (guard01@sentry.test is pre-filled in dev test mode)
+    // Sign in as Administrator so Overview, Live Gates & Access Logs are visible.
+    await tester.tap(find.byKey(const Key('persona_admin_chip')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('login_submit_button')));
     await tester.pump();
 

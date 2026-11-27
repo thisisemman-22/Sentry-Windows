@@ -525,6 +525,138 @@ class GuestGateVerificationResultDto {
   }
 }
 
+/// Normalizes typed or pasted guest pass codes (`bsual 1234`, `BSUAL-1234`, `1234`)
+/// into the exact 4-digit string, returning `null` when invalid.
+String? normalizeGuestPassDigits(String raw) {
+  var normalized = raw.toUpperCase().replaceAll(RegExp(r'[\s\-–—_]+'), '');
+  if (normalized.startsWith('BSUAL')) {
+    normalized = normalized.substring(5);
+  }
+  if (!RegExp(r'^[0-9]{4}$').hasMatch(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+/// Normalizes typed or pasted guest pass codes into canonical `BSUAL-XXXX` format.
+String? normalizeGuestPassCode(String raw) {
+  final digits = normalizeGuestPassDigits(raw);
+  return digits == null ? null : 'BSUAL-$digits';
+}
+
+/// Pre-confirmation Guest Check lookup result showing Guest Name, Visit Date
+/// & Time Window, and Vehicle (type & plate) so Guards can match physical ID.
+class GuestPassLookupDto {
+  final String passCode;
+  final String visitRequestId;
+  final String guestFullName;
+  final DateTime visitDateUtc;
+  final DateTime windowStartUtc;
+  final DateTime windowEndUtc;
+  final String windowLabel;
+  final String vehicleType;
+  final String plateNumber;
+  final String hostName;
+  final String purpose;
+  final bool alreadyConfirmed;
+
+  const GuestPassLookupDto({
+    required this.passCode,
+    required this.visitRequestId,
+    required this.guestFullName,
+    required this.visitDateUtc,
+    required this.windowStartUtc,
+    required this.windowEndUtc,
+    required this.windowLabel,
+    required this.vehicleType,
+    required this.plateNumber,
+    required this.hostName,
+    required this.purpose,
+    this.alreadyConfirmed = false,
+  });
+
+  factory GuestPassLookupDto.fromJson(Map<String, dynamic> json) {
+    final start =
+        DateTime.tryParse(json['window_start']?.toString() ?? '')?.toUtc() ??
+            DateTime.now().toUtc();
+    return GuestPassLookupDto(
+      passCode: json['pass_code']?.toString() ?? '',
+      visitRequestId: json['visit_request_id']?.toString() ?? '',
+      guestFullName: json['guest_full_name']?.toString() ?? 'Campus Guest',
+      visitDateUtc:
+          DateTime.tryParse(json['visit_date']?.toString() ?? '')?.toUtc() ??
+              start,
+      windowStartUtc: start,
+      windowEndUtc:
+          DateTime.tryParse(json['window_end']?.toString() ?? '')?.toUtc() ??
+              start.add(const Duration(hours: 4)),
+      windowLabel: json['window_label']?.toString() ?? '',
+      vehicleType: json['vehicle_type']?.toString() ?? 'car',
+      plateNumber: json['plate_number']?.toString() ?? 'UNSPECIFIED',
+      hostName: json['host_name']?.toString() ?? 'Host Department',
+      purpose: json['purpose']?.toString() ?? 'Approved campus visit',
+      alreadyConfirmed: json['already_confirmed'] == true,
+    );
+  }
+}
+
+/// Guard Manual Entry log for Guest Motorcycles & Guests on Foot.
+class ManualGuestEntryDto {
+  final String entryId;
+  final String entryCategory; // 'guest_motorcycle' | 'guest_on_foot'
+  final String guestFullName;
+  final String? passCode;
+  final String? plateOrDescription;
+  final String? purposeAndIdCheck;
+  final String notes;
+  final String recordedByUserCode;
+  final DateTime recordedAtUtc;
+
+  const ManualGuestEntryDto({
+    required this.entryId,
+    required this.entryCategory,
+    required this.guestFullName,
+    this.passCode,
+    this.plateOrDescription,
+    this.purposeAndIdCheck,
+    required this.notes,
+    required this.recordedByUserCode,
+    required this.recordedAtUtc,
+  });
+
+  bool get isMotorcycle => entryCategory == 'guest_motorcycle';
+
+  factory ManualGuestEntryDto.fromJson(Map<String, dynamic> json) {
+    return ManualGuestEntryDto(
+      entryId: json['entry_id']?.toString() ?? '',
+      entryCategory: json['entry_category']?.toString() ?? 'guest_motorcycle',
+      guestFullName: json['guest_full_name']?.toString() ?? '',
+      passCode: json['pass_code']?.toString(),
+      plateOrDescription: json['plate_or_description']?.toString(),
+      purposeAndIdCheck: json['purpose_and_id_check']?.toString(),
+      notes: json['notes']?.toString() ?? '',
+      recordedByUserCode: json['recorded_by_user_code']?.toString() ?? 'G001',
+      recordedAtUtc:
+          DateTime.tryParse(json['recorded_at']?.toString() ?? '')?.toUtc() ??
+              DateTime.now().toUtc(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'entry_id': entryId,
+        'entry_category': entryCategory,
+        'guest_full_name': guestFullName,
+        if (passCode != null && passCode!.isNotEmpty) 'pass_code': passCode,
+        if (plateOrDescription != null && plateOrDescription!.isNotEmpty)
+          'plate_or_description': plateOrDescription,
+        if (purposeAndIdCheck != null && purposeAndIdCheck!.isNotEmpty)
+          'purpose_and_id_check': purposeAndIdCheck,
+        'notes': notes,
+        'recorded_by_user_code': recordedByUserCode,
+        'recorded_at': ManilaTime.toUtcIso(recordedAtUtc),
+      };
+}
+
 /// 6 Report Presets per 2026-11-27 Desktop Spec.
 enum ReportPreset {
   occupancy('occupancy', 'Occupancy', false),

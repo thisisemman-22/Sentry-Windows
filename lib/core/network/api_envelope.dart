@@ -107,6 +107,9 @@ class ErrorCatalog {
     'OCCUPANCY_CONFLICT',
     'CONFIGURATION_INVALID',
     'AMBIGUOUS_VEHICLE',
+    'UNMATCHED_PLATE',
+    'LOT_B5_OVERFLOW_EXIT',
+    'GUEST_PLATE_MISMATCH',
   };
 
   static bool isHardSecurityDenial(String reasonCode) =>

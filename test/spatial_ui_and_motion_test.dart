@@ -80,6 +80,8 @@ void main() {
       );
       await settle(tester);
 
+      await tester.tap(find.byKey(const Key('persona_admin_chip')));
+      await settle(tester);
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await settle(tester);
 
@@ -129,6 +131,8 @@ void main() {
       );
       await settle(tester);
 
+      await tester.tap(find.byKey(const Key('persona_admin_chip')));
+      await settle(tester);
       await tester.tap(find.byKey(const Key('login_submit_button')));
       await settle(tester);
 

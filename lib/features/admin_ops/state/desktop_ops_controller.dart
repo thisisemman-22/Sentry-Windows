@@ -19,6 +19,10 @@ class DesktopOpsState {
   final List<GuestVisitRequestDto> guestVisitRequests;
   final List<GuestAccountDto> guestAccounts;
   final GuestGateVerificationResultDto? lastGuestVerification;
+  final GuestPassLookupDto? activeGuestLookup;
+  final int failedGuestPassAttempts;
+  final DateTime? guestPassLockoutUntilUtc;
+  final List<ManualGuestEntryDto> manualGuestEntries;
   final List<ExportHistoryEntryDto> exportHistory;
   final List<AnnouncementDto> announcements;
   final List<ProfileDto> guardAccounts;
@@ -36,6 +40,10 @@ class DesktopOpsState {
     this.guestVisitRequests = const [],
     this.guestAccounts = const [],
     this.lastGuestVerification,
+    this.activeGuestLookup,
+    this.failedGuestPassAttempts = 0,
+    this.guestPassLockoutUntilUtc,
+    this.manualGuestEntries = const [],
     this.exportHistory = const [],
     this.announcements = const [],
     this.guardAccounts = const [],
@@ -55,6 +63,12 @@ class DesktopOpsState {
     List<GuestAccountDto>? guestAccounts,
     GuestGateVerificationResultDto? lastGuestVerification,
     bool clearLastGuestVerification = false,
+    GuestPassLookupDto? activeGuestLookup,
+    bool clearActiveGuestLookup = false,
+    int? failedGuestPassAttempts,
+    DateTime? guestPassLockoutUntilUtc,
+    bool clearGuestPassLockout = false,
+    List<ManualGuestEntryDto>? manualGuestEntries,
     List<ExportHistoryEntryDto>? exportHistory,
     List<AnnouncementDto>? announcements,
     List<ProfileDto>? guardAccounts,
@@ -74,6 +88,15 @@ class DesktopOpsState {
       lastGuestVerification: clearLastGuestVerification
           ? null
           : (lastGuestVerification ?? this.lastGuestVerification),
+      activeGuestLookup: clearActiveGuestLookup
+          ? null
+          : (activeGuestLookup ?? this.activeGuestLookup),
+      failedGuestPassAttempts:
+          failedGuestPassAttempts ?? this.failedGuestPassAttempts,
+      guestPassLockoutUntilUtc: clearGuestPassLockout
+          ? null
+          : (guestPassLockoutUntilUtc ?? this.guestPassLockoutUntilUtc),
+      manualGuestEntries: manualGuestEntries ?? this.manualGuestEntries,
       exportHistory: exportHistory ?? this.exportHistory,
       announcements: announcements ?? this.announcements,
       guardAccounts: guardAccounts ?? this.guardAccounts,
@@ -86,6 +109,7 @@ class DesktopOpsController extends StateNotifier<DesktopOpsState> {
   DataSourceMode dataSourceMode;
   final DesktopOpsRepository repository;
   final void Function(AuditLogDto log)? onAppendAudit;
+  final void Function(String feedLine)? onAppendActivity;
 
   /// Current active General Password held in memory ONLY during Mock Test Mode.
   String _mockGeneralPassword = 'SENTRY-WELCOME-2026!';
@@ -95,6 +119,7 @@ class DesktopOpsController extends StateNotifier<DesktopOpsState> {
     required this.dataSourceMode,
     required this.repository,
     this.onAppendAudit,
+    this.onAppendActivity,
   }) : super(
           dataSourceMode == DataSourceMode.real
               ? const DesktopOpsState()
@@ -701,6 +726,325 @@ class DesktopOpsController extends StateNotifier<DesktopOpsState> {
     return ApiEnvelope.success(result);
   }
 
+  /// Guard-only two-step Guest Check: Lookup approved guest pass (normalizing
+  /// typed digits or pasted `bsual 1234` / `BSUAL-1234`), enforcing outside-window
+  /// refusal and 429 rate-limit lockout on repeated failed tries.
+  Future<ApiEnvelope<GuestPassLookupDto>> lookupGuestGatePass({
+    required String rawInput,
+    required ProfileDto actor,
+    DateTime? nowOverrideUtc,
+  }) async {
+    if (!actor.role.isGuard) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only Security Guard accounts can look up guest passes at the gate.',
+        httpStatus: 403,
+      );
+    }
+
+    final now = (nowOverrideUtc ?? DateTime.now()).toUtc();
+    final lockoutUntil = state.guestPassLockoutUntilUtc;
+    if (lockoutUntil != null && now.isBefore(lockoutUntil)) {
+      final remaining = lockoutUntil.difference(now).inSeconds + 1;
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.rateLimited,
+        message:
+            'Rate-limit lockout active (429). Wait ${remaining}s before retrying.',
+        httpStatus: 429,
+        details: {'retry_after_seconds': remaining},
+      );
+    }
+    if (lockoutUntil != null && !now.isBefore(lockoutUntil)) {
+      state = state.copyWith(
+        failedGuestPassAttempts: 0,
+        clearGuestPassLockout: true,
+      );
+    }
+
+    final digits = normalizeGuestPassDigits(rawInput);
+    if (digits == null) {
+      return ApiEnvelope.failure(
+        code: 'INVALID_PASS_CODE',
+        message:
+            'Enter 4 digits or paste a valid BSUAL-XXXX guest code (e.g. 1234 or BSUAL-1234).',
+        httpStatus: 422,
+      );
+    }
+
+    final canonicalCode = 'BSUAL-$digits';
+    if (dataSourceMode == DataSourceMode.real) {
+      final res = await repository.lookupGuestGatePass(passCode: canonicalCode);
+      if (res.ok && res.data != null) {
+        state = state.copyWith(
+          activeGuestLookup: res.data,
+          failedGuestPassAttempts: 0,
+          clearGuestPassLockout: true,
+        );
+        return res;
+      }
+      if (res.error?.httpStatus == 429 ||
+          res.error?.code == ErrorCatalog.rateLimited) {
+        final retryAfter = res.error?.retryAfterSeconds ?? 30;
+        state = state.copyWith(
+          guestPassLockoutUntilUtc: now.add(Duration(seconds: retryAfter)),
+          clearActiveGuestLookup: true,
+        );
+      } else {
+        final nextFailed = state.failedGuestPassAttempts + 1;
+        state = state.copyWith(
+          failedGuestPassAttempts: nextFailed,
+          clearActiveGuestLookup: true,
+        );
+      }
+      return res;
+    }
+
+    // Mock / Developer Test Mode lookup simulation:
+    // - 1234 / 4829 -> active in-window approved guest GV-204 (Engr. Maria Clara Santos, NGA 8821)
+    // - 2030 / 7703 -> tomorrow's approved guest GV-203 (outside visit window refusal)
+    // - anything else -> invalid pass code -> 3rd failure triggers 429 lockout for 30s
+    if (digits == '1234' || digits == '4829') {
+      final req = state.guestVisitRequests
+          .where((g) => g.visitRequestId == 'GV-204')
+          .firstOrNull;
+      final start = req?.windowStartUtc ?? now.subtract(const Duration(minutes: 45));
+      final end = req?.windowEndUtc ?? now.add(const Duration(hours: 3));
+      final lookup = GuestPassLookupDto(
+        passCode: canonicalCode,
+        visitRequestId: req?.visitRequestId ?? 'GV-204',
+        guestFullName: req?.guestFullName ?? 'Engr. Maria Clara Santos',
+        visitDateUtc: req?.visitDateUtc ?? now,
+        windowStartUtc: start,
+        windowEndUtc: end,
+        windowLabel:
+            '${ManilaTime.formatShort(start)} – ${ManilaTime.formatShort(end)} PHT',
+        vehicleType: req?.vehicleType ?? 'car',
+        plateNumber: req?.plateNumber ?? 'NGA 8821',
+        hostName: req?.hostName ?? "CEAFA Dean's Office",
+        purpose: req?.purpose ?? 'Industry Advisory Review',
+        alreadyConfirmed: req?.isCurrentlyInside ?? false,
+      );
+      state = state.copyWith(
+        activeGuestLookup: lookup,
+        failedGuestPassAttempts: 0,
+        clearGuestPassLockout: true,
+      );
+      return ApiEnvelope.success(lookup);
+    }
+
+    if (digits == '2030' || digits == '7703') {
+      final req = state.guestVisitRequests
+          .where((g) => g.visitRequestId == 'GV-203')
+          .firstOrNull;
+      final start = req?.windowStartUtc ?? now.add(const Duration(hours: 12));
+      final end = req?.windowEndUtc ?? now.add(const Duration(hours: 18));
+      state = state.copyWith(clearActiveGuestLookup: true);
+      return ApiEnvelope.failure(
+        code: 'OUTSIDE_VISIT_WINDOW',
+        message:
+            'Outside visit window: ${req?.guestFullName ?? 'Dr. Tomas Aquino'} ($canonicalCode) is scheduled for ${ManilaTime.formatShort(start)} – ${ManilaTime.formatShort(end)} PHT.',
+        httpStatus: 403,
+        details: {'pass_code': canonicalCode},
+      );
+    }
+
+    final nextFailures = state.failedGuestPassAttempts + 1;
+    if (nextFailures >= 3) {
+      const lockoutSec = 30;
+      state = state.copyWith(
+        failedGuestPassAttempts: nextFailures,
+        guestPassLockoutUntilUtc: now.add(const Duration(seconds: lockoutSec)),
+        clearActiveGuestLookup: true,
+      );
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.rateLimited,
+        message:
+            'Too many failed guest code attempts (429). Gate lookup locked for ${lockoutSec}s.',
+        httpStatus: 429,
+        details: {'retry_after_seconds': lockoutSec},
+      );
+    }
+
+    state = state.copyWith(
+      failedGuestPassAttempts: nextFailures,
+      clearActiveGuestLookup: true,
+    );
+    return ApiEnvelope.failure(
+      code: 'INVALID_GUEST_CODE',
+      message:
+          'No approved guest visit matches $canonicalCode (attempt $nextFailures of 3 before lockout).',
+      httpStatus: 404,
+    );
+  }
+
+  /// Step 2 of Guard Guest Check: confirms physical ID match and allows guest car
+  /// to open by plate.
+  Future<ApiEnvelope<GuestGateVerificationResultDto>> confirmGuestGatePass({
+    required GuestPassLookupDto lookup,
+    String laneId = 'lane-car-in',
+    required ProfileDto actor,
+  }) async {
+    if (!actor.role.isGuard) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only Security Guard accounts can confirm guest gate passes.',
+        httpStatus: 403,
+      );
+    }
+
+    if (dataSourceMode == DataSourceMode.real) {
+      final res = await repository.confirmGuestGatePass(
+        passCode: lookup.passCode,
+        laneId: laneId,
+      );
+      if (res.ok && res.data != null) {
+        state = state.copyWith(
+          lastGuestVerification: res.data,
+          clearActiveGuestLookup: true,
+        );
+      }
+      return res;
+    }
+
+    final updatedVisits = state.guestVisitRequests.map((g) {
+      if (g.visitRequestId == lookup.visitRequestId) {
+        return g.copyWith(isCurrentlyInside: true);
+      }
+      return g;
+    }).toList();
+
+    final result = GuestGateVerificationResultDto(
+      passCode: lookup.passCode,
+      verified: true,
+      guestFullName: lookup.guestFullName,
+      plateNumber: lookup.plateNumber,
+      hostName: lookup.hostName,
+      windowLabel: lookup.windowLabel,
+      message:
+          'Confirmed ${lookup.passCode} for ${lookup.guestFullName} (${lookup.plateNumber}). Barrier enabled by plate.',
+    );
+
+    state = state.copyWith(
+      guestVisitRequests: updatedVisits,
+      lastGuestVerification: result,
+      clearActiveGuestLookup: true,
+      failedGuestPassAttempts: 0,
+      clearGuestPassLockout: true,
+    );
+    _recordAudit(
+      actor: actor,
+      action: 'guest_gate_pass_confirmed',
+      resourceType: 'guest_pass',
+      resourceId: lookup.passCode,
+      summary:
+          'Guard ${actor.userCode} confirmed ${lookup.passCode} (${lookup.guestFullName} · ${lookup.plateNumber}) at $laneId.',
+    );
+    onAppendActivity?.call(
+      'GUEST CHECK (${lookup.passCode}): Confirmed ${lookup.guestFullName} · Plate ${lookup.plateNumber} authorized.',
+    );
+    return ApiEnvelope.success(result);
+  }
+
+  void clearGuestLookup() {
+    state = state.copyWith(clearActiveGuestLookup: true);
+  }
+
+  /// Guard Manual Entry recording for Guest Motorcycles & Guests on Foot.
+  Future<ApiEnvelope<ManualGuestEntryDto>> recordManualGuestEntry({
+    required String entryCategory, // 'guest_motorcycle' | 'guest_on_foot'
+    required String guestFullName,
+    String? rawPassCode,
+    String? plateOrDescription,
+    String? purposeAndIdCheck,
+    String? notes,
+    required ProfileDto actor,
+  }) async {
+    if (!actor.role.isGuard) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only Security Guard accounts can record manual guest entries.',
+        httpStatus: 403,
+      );
+    }
+
+    final name = guestFullName.trim();
+    if (name.isEmpty) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message: 'Guest full name is required.',
+        httpStatus: 422,
+      );
+    }
+
+    String? normalizedPass;
+    final trimmedPass = rawPassCode?.trim() ?? '';
+    if (trimmedPass.isNotEmpty) {
+      normalizedPass = normalizeGuestPassCode(trimmedPass);
+      if (normalizedPass == null) {
+        return ApiEnvelope.failure(
+          code: 'INVALID_PASS_CODE',
+          message: 'Pass code must contain 4 digits (e.g. 1234 or BSUAL-1234).',
+          httpStatus: 422,
+        );
+      }
+    }
+
+    final plateDesc = plateOrDescription?.trim() ?? '';
+    final purposeCheck = purposeAndIdCheck?.trim() ?? '';
+    if (entryCategory == 'guest_motorcycle' && plateDesc.isEmpty) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message: 'Plate number or motorcycle description is required.',
+        httpStatus: 422,
+      );
+    }
+    if (entryCategory == 'guest_on_foot' && purposeCheck.isEmpty) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.validationError,
+        message: 'Purpose / physical ID check details are required.',
+        httpStatus: 422,
+      );
+    }
+
+    final entry = ManualGuestEntryDto(
+      entryId: _nextId('MGE'),
+      entryCategory: entryCategory,
+      guestFullName: name,
+      passCode: normalizedPass,
+      plateOrDescription: plateDesc.isEmpty ? null : plateDesc,
+      purposeAndIdCheck: purposeCheck.isEmpty ? null : purposeCheck,
+      notes: notes?.trim() ?? '',
+      recordedByUserCode: actor.userCode,
+      recordedAtUtc: DateTime.now().toUtc(),
+    );
+
+    if (dataSourceMode == DataSourceMode.real) {
+      final res = await repository.recordManualGuestEntry(entry);
+      if (res.ok && res.data != null) {
+        state = state.copyWith(
+          manualGuestEntries: [res.data!, ...state.manualGuestEntries],
+        );
+      }
+      return res;
+    }
+
+    state = state.copyWith(
+      manualGuestEntries: [entry, ...state.manualGuestEntries],
+    );
+    _recordAudit(
+      actor: actor,
+      action: 'manual_guest_entry_recorded',
+      resourceType: 'manual_guest_entry',
+      resourceId: entry.entryId,
+      summary:
+          'Guard ${actor.userCode} recorded manual ${entry.isMotorcycle ? 'guest motorcycle' : 'guest on foot'} entry for ${entry.guestFullName}.',
+    );
+    onAppendActivity?.call(
+      'MANUAL ENTRY (${entry.isMotorcycle ? 'Motorcycle' : 'On Foot'}): ${entry.guestFullName}${entry.plateOrDescription != null ? ' · ${entry.plateOrDescription}' : ''}',
+    );
+    return ApiEnvelope.success(entry);
+  }
+
   // --- Export History ---
 
   void recordReportExport({
@@ -709,6 +1053,7 @@ class DesktopOpsController extends StateNotifier<DesktopOpsState> {
     required String filterSummary,
     required ProfileDto actor,
   }) {
+    if (!actor.role.isAdmin) return;
     final entry = ExportHistoryEntryDto(
       exportId: _nextId('EXP'),
       presetLabel: presetLabel,

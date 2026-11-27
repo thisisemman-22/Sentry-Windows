@@ -225,6 +225,7 @@ class AuthController extends StateNotifier<AuthState> {
     this.onSessionCleared,
     this.onUnlockDevMode,
     this.onDifferentAccountSignedIn,
+    this.onRoleAuthenticated,
     this.initialUserId,
   })  : _lastAuthenticatedUserId = initialUserId,
         super(const AuthState());
@@ -256,6 +257,8 @@ class AuthController extends StateNotifier<AuthState> {
     }
     _lastAuthenticatedUserId = userId;
   }
+
+  final void Function(UserRole role)? onRoleAuthenticated;
 
   /// Authenticates a Guard or Administrator (`POST /api/v1/auth/login` -> `GET /api/v1/me`).
   /// - NEVER trims or normalizes `password`.
@@ -306,6 +309,7 @@ class AuthController extends StateNotifier<AuthState> {
       );
       _recordSignedInAccount(adminProfile.userId);
       await sessionStore.saveSession(devSession);
+      onRoleAuthenticated?.call(adminProfile.role);
       state = AuthState(session: devSession);
       return true;
     }
@@ -392,6 +396,7 @@ class AuthController extends StateNotifier<AuthState> {
       final realSession = SessionDto.fromTokenPairAndProfile(pair, profileData);
       _recordSignedInAccount(profileData.id);
       await sessionStore.saveSession(realSession);
+      onRoleAuthenticated?.call(profileData.role);
       state = AuthState(session: realSession);
       return true;
     }
@@ -456,6 +461,7 @@ class AuthController extends StateNotifier<AuthState> {
 
     _recordSignedInAccount(matchedProfile.userId);
     await sessionStore.saveSession(session);
+    onRoleAuthenticated?.call(matchedProfile.role);
     state = AuthState(session: session);
     return true;
   }
@@ -478,6 +484,7 @@ class AuthController extends StateNotifier<AuthState> {
     );
     _recordSignedInAccount(profile.userId);
     await sessionStore.saveSession(session);
+    onRoleAuthenticated?.call(profile.role);
     state = AuthState(session: session);
   }
 
@@ -663,6 +670,10 @@ final StateNotifierProvider<AuthController, AuthState> authControllerProvider =
         ref.read(registerFormControllerProvider.notifier).resetAll();
       }
     },
+    onRoleAuthenticated: (role) {
+      ref.read(selectedDesktopTabProvider.notifier).state =
+          DesktopNavTab.defaultFor(role);
+    },
   );
   ref.listen<AppConfig>(appConfigProvider, (_, next) {
     controller.updateConfig(next);
@@ -710,6 +721,9 @@ final StateNotifierProvider<DesktopOpsController, DesktopOpsState>
     onAppendAudit: (log) {
       ref.read(sentryScenarioProvider.notifier).appendAuditLog(log);
     },
+    onAppendActivity: (line) {
+      ref.read(sentryScenarioProvider.notifier).appendActivityFeedLine(line);
+    },
   );
   ref.listen<AppConfig>(appConfigProvider, (prev, next) {
     if (next.isMock && prev?.isReal == true) {
@@ -721,41 +735,85 @@ final StateNotifierProvider<DesktopOpsController, DesktopOpsState>
   return controller;
 });
 
-/// Updated 10-Section SENTRY Desktop Navigation (2026-11-27 Spec).
+enum NavRoleScope { adminOnly, guardOnly }
+
+/// Role-scoped Desktop Navigation (10 Admin sections + 5 Guard sections).
 enum DesktopNavTab {
+  // --- Administrator 10-Section Workspace ---
   dashboard('Dashboard', 'How campus parking looks right now.',
-      Icons.space_dashboard_outlined, Icons.space_dashboard_rounded, false),
+      Icons.space_dashboard_outlined, Icons.space_dashboard_rounded,
+      NavRoleScope.adminOnly),
   users('Users', 'Accounts, registration, face enrollment & password resets.',
-      Icons.people_outline_rounded, Icons.people_rounded, true),
+      Icons.people_outline_rounded, Icons.people_rounded,
+      NavRoleScope.adminOnly),
   vehiclesRfid('Vehicles & RFID', 'Vehicles, user requests & RFID inventory.',
-      Icons.directions_car_outlined, Icons.directions_car_rounded, true),
+      Icons.directions_car_outlined, Icons.directions_car_rounded,
+      NavRoleScope.adminOnly),
   parking('Parking', 'Lots B1–B5 blueprints, status & parking rules.',
-      Icons.local_parking_outlined, Icons.local_parking_rounded, false),
+      Icons.local_parking_outlined, Icons.local_parking_rounded,
+      NavRoleScope.adminOnly),
   guests('Guests', 'Guest visit approvals, accounts & overdue stays.',
-      Icons.badge_outlined, Icons.badge_rounded, true),
+      Icons.badge_outlined, Icons.badge_rounded,
+      NavRoleScope.adminOnly),
   monitoring('Monitoring', 'Live gates, reviews, entries/exits & hardware.',
-      Icons.videocam_outlined, Icons.videocam_rounded, false),
+      Icons.videocam_outlined, Icons.videocam_rounded,
+      NavRoleScope.adminOnly),
   reports('Reports', 'Preset reports, masked previews & CSV/PDF exports.',
-      Icons.analytics_outlined, Icons.analytics_rounded, false),
+      Icons.analytics_outlined, Icons.analytics_rounded,
+      NavRoleScope.adminOnly),
   announcements('Announcements', 'Member notices pushed to mobile app.',
-      Icons.campaign_outlined, Icons.campaign_rounded, true),
+      Icons.campaign_outlined, Icons.campaign_rounded,
+      NavRoleScope.adminOnly),
   audit('Audit', 'Searchable security and administrative audit trail.',
-      Icons.policy_outlined, Icons.policy_rounded, true),
+      Icons.policy_outlined, Icons.policy_rounded,
+      NavRoleScope.adminOnly),
   settings('Settings', 'Read-only backend security & system configuration.',
-      Icons.settings_outlined, Icons.settings_rounded, true);
+      Icons.settings_outlined, Icons.settings_rounded,
+      NavRoleScope.adminOnly),
+
+  // --- Security Guard 5-Screen Workspace ---
+  guardReviewQueue('Review Queue',
+      'Unresolved gate cases needing a guard decision.',
+      Icons.fact_check_outlined, Icons.fact_check_rounded,
+      NavRoleScope.guardOnly),
+  guardMonitor('Monitor',
+      'Live B1–B5 availability, cameras online/offline & entries/exits.',
+      Icons.videocam_outlined, Icons.videocam_rounded,
+      NavRoleScope.guardOnly),
+  guardGuestCheck('Guest Check',
+      'Verify approved BSUAL-XXXX guest passes before gate opening.',
+      Icons.pin_outlined, Icons.pin_rounded,
+      NavRoleScope.guardOnly),
+  guardManualEntry('Manual Entry',
+      'Record entry by hand for guest motorcycles and guests on foot.',
+      Icons.edit_note_rounded, Icons.edit_note_rounded,
+      NavRoleScope.guardOnly),
+  guardOverdueGuests('Overdue Guest Cars',
+      'Guest vehicles inside campus past their approved visit window.',
+      Icons.timer_off_outlined, Icons.timer_off_rounded,
+      NavRoleScope.guardOnly);
 
   final String title;
   final String subtitle;
   final IconData icon;
   final IconData selectedIcon;
-  final bool isAdminOnly;
+  final NavRoleScope roleScope;
   const DesktopNavTab(
     this.title,
     this.subtitle,
     this.icon,
     this.selectedIcon,
-    this.isAdminOnly,
+    this.roleScope,
   );
+
+  bool get isAdminOnly => roleScope == NavRoleScope.adminOnly;
+  bool get isGuardOnly => roleScope == NavRoleScope.guardOnly;
+
+  bool isVisibleFor(UserRole role) =>
+      role.isAdmin ? isAdminOnly : isGuardOnly;
+
+  static DesktopNavTab defaultFor(UserRole role) =>
+      role.isAdmin ? DesktopNavTab.dashboard : DesktopNavTab.guardReviewQueue;
 }
 
 final selectedDesktopTabProvider = StateProvider<DesktopNavTab>((ref) {

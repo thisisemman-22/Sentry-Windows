@@ -702,6 +702,70 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
         faceSimilarityScore: 0.21,
         evidenceEventIds: const ['80000000-0000-4000-8000-000000000091'],
       ),
+      GuardReviewQueueItem(
+        reviewCaseId: 'RV-105',
+        correlationId: '90000000-0000-4000-8000-000000000105',
+        decisionId: '40000000-0000-4000-8000-000000000105',
+        gateId: 'gate-north',
+        laneId: 'lane-car-in',
+        direction: 'entry',
+        vehicleType: 'car',
+        outcome: 'review_required',
+        reasonCode: 'UNMATCHED_PLATE',
+        reasonMessage:
+            'OCR read partial/unmatched plate NGA 4021 under gate glare; manual guard plate check required.',
+        currentAttemptVersion: 1,
+        attemptState: 'guard_review_required',
+        createdAtUtc: now.subtract(const Duration(minutes: 4)),
+        attemptExpiresAtUtc: now.add(const Duration(minutes: 6)),
+        plateText: 'NGA 4021',
+        ocrConfidence: 0.61,
+        faceRecognitionStatus: 'uncertain',
+        faceSimilarityScore: 0.58,
+        evidenceEventIds: const ['80000000-0000-4000-8000-000000000105'],
+      ),
+      GuardReviewQueueItem(
+        reviewCaseId: 'RV-106',
+        correlationId: '90000000-0000-4000-8000-000000000106',
+        decisionId: '40000000-0000-4000-8000-000000000106',
+        gateId: 'gate-north',
+        laneId: 'lane-car-out',
+        direction: 'exit',
+        vehicleType: 'car',
+        outcome: 'review_required',
+        reasonCode: 'LOT_B5_OVERFLOW_EXIT',
+        reasonMessage:
+            'Car leaving Lot B5 (Overflow) at Gate 2 exit lane; confirm departure to update B5 aggregate count.',
+        currentAttemptVersion: 1,
+        attemptState: 'guard_review_required',
+        createdAtUtc: now.subtract(const Duration(minutes: 3)),
+        attemptExpiresAtUtc: now.add(const Duration(minutes: 6)),
+        plateText: 'CBC 819',
+        ocrConfidence: 0.95,
+        faceRecognitionStatus: 'not_required',
+        evidenceEventIds: const ['80000000-0000-4000-8000-000000000106'],
+      ),
+      GuardReviewQueueItem(
+        reviewCaseId: 'RV-107',
+        correlationId: '90000000-0000-4000-8000-000000000107',
+        decisionId: '40000000-0000-4000-8000-000000000107',
+        gateId: 'gate-north',
+        laneId: 'lane-car-in',
+        direction: 'entry',
+        vehicleType: 'car',
+        outcome: 'review_required',
+        reasonCode: 'GUEST_PLATE_MISMATCH',
+        reasonMessage:
+            'Approved guest visit on file, but entry camera read shared/alternate plate VSA 772 instead of declared VSA 771.',
+        currentAttemptVersion: 1,
+        attemptState: 'guard_review_required',
+        createdAtUtc: now.subtract(const Duration(minutes: 1)),
+        attemptExpiresAtUtc: now.add(const Duration(minutes: 6)),
+        plateText: 'VSA 772',
+        ocrConfidence: 0.93,
+        faceRecognitionStatus: 'not_required',
+        evidenceEventIds: const ['80000000-0000-4000-8000-000000000107'],
+      ),
     ];
 
     final initialAudits = <AuditLogDto>[
@@ -1242,6 +1306,13 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     required int expectedAttemptVersion,
     required ProfileDto actor,
   }) {
+    if (!actor.role.isGuard) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only Security Guard accounts can resolve review cases.',
+        httpStatus: 403,
+      );
+    }
     final trimmed = reason.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
       return ApiEnvelope.failure(
@@ -2832,6 +2903,13 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
     required int expectedAttemptVersion,
     required ProfileDto actor,
   }) async {
+    if (!actor.role.isGuard) {
+      return ApiEnvelope.failure(
+        code: ErrorCatalog.accessDenied,
+        message: 'Only Security Guard accounts can resolve review cases.',
+        httpStatus: 403,
+      );
+    }
     if (dataSourceMode == DataSourceMode.mock) {
       return submitGuardReview(
         reviewCaseId: item.reviewCaseId,
@@ -3030,6 +3108,13 @@ class SentryScenarioController extends StateNotifier<SentrySystemState> {
   /// Appends an audited event entry to the shared `auditLogs` stream.
   void appendAuditLog(AuditLogDto log) {
     state = state.copyWith(auditLogs: [log, ...state.auditLogs]);
+  }
+
+  /// Prepends a concise operational activity line in mock / live sessions.
+  void appendActivityFeedLine(String line) {
+    state = state.copyWith(
+      recentActivityFeed: [line, ...state.recentActivityFeed.take(19)],
+    );
   }
 
   /// Edits a participant's basic profile metadata (`Users` detail drawer).
